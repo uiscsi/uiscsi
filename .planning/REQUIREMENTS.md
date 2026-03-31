@@ -186,93 +186,103 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PDU-01 | Pending | Pending |
-| PDU-02 | Pending | Pending |
-| PDU-03 | Pending | Pending |
-| PDU-04 | Pending | Pending |
-| XPORT-01 | Pending | Pending |
-| XPORT-02 | Pending | Pending |
-| XPORT-03 | Pending | Pending |
-| XPORT-04 | Pending | Pending |
-| LOGIN-01 | Pending | Pending |
-| LOGIN-02 | Pending | Pending |
-| LOGIN-03 | Pending | Pending |
-| LOGIN-04 | Pending | Pending |
-| LOGIN-05 | Pending | Pending |
-| LOGIN-06 | Pending | Pending |
-| SESS-01 | Pending | Pending |
-| SESS-02 | Pending | Pending |
-| SESS-03 | Pending | Pending |
-| SESS-04 | Pending | Pending |
-| SESS-05 | Pending | Pending |
-| READ-01 | Pending | Pending |
-| READ-02 | Pending | Pending |
-| READ-03 | Pending | Pending |
-| WRITE-01 | Pending | Pending |
-| WRITE-02 | Pending | Pending |
-| WRITE-03 | Pending | Pending |
-| WRITE-04 | Pending | Pending |
-| WRITE-05 | Pending | Pending |
-| INTEG-01 | Pending | Pending |
-| INTEG-02 | Pending | Pending |
-| INTEG-03 | Pending | Pending |
-| TMF-01 | Pending | Pending |
-| TMF-02 | Pending | Pending |
-| TMF-03 | Pending | Pending |
-| TMF-04 | Pending | Pending |
-| TMF-05 | Pending | Pending |
-| TMF-06 | Pending | Pending |
-| ERL-01 | Pending | Pending |
-| ERL-02 | Pending | Pending |
-| ERL-03 | Pending | Pending |
-| EVT-01 | Pending | Pending |
-| EVT-02 | Pending | Pending |
-| EVT-03 | Pending | Pending |
-| DISC-01 | Pending | Pending |
-| DISC-02 | Pending | Pending |
-| SCSI-01 | Pending | Pending |
-| SCSI-02 | Pending | Pending |
-| SCSI-03 | Pending | Pending |
-| SCSI-04 | Pending | Pending |
-| SCSI-05 | Pending | Pending |
-| SCSI-06 | Pending | Pending |
-| SCSI-07 | Pending | Pending |
-| SCSI-08 | Pending | Pending |
-| SCSI-09 | Pending | Pending |
-| SCSI-10 | Pending | Pending |
-| SCSI-11 | Pending | Pending |
-| SCSI-12 | Pending | Pending |
-| SCSI-13 | Pending | Pending |
-| SCSI-14 | Pending | Pending |
-| SCSI-15 | Pending | Pending |
-| SCSI-16 | Pending | Pending |
-| SCSI-17 | Pending | Pending |
-| SCSI-18 | Pending | Pending |
-| SCSI-19 | Pending | Pending |
-| API-01 | Pending | Pending |
-| API-02 | Pending | Pending |
-| API-03 | Pending | Pending |
-| API-04 | Pending | Pending |
-| API-05 | Pending | Pending |
-| OBS-01 | Pending | Pending |
-| OBS-02 | Pending | Pending |
-| OBS-03 | Pending | Pending |
-| TEST-01 | Pending | Pending |
-| TEST-02 | Pending | Pending |
-| TEST-03 | Pending | Pending |
-| TEST-04 | Pending | Pending |
-| TEST-05 | Pending | Pending |
-| DOC-01 | Pending | Pending |
-| DOC-02 | Pending | Pending |
-| DOC-03 | Pending | Pending |
-| DOC-04 | Pending | Pending |
-| DOC-05 | Pending | Pending |
+| PDU-01 | Phase 1 | Pending |
+| PDU-02 | Phase 1 | Pending |
+| PDU-03 | Phase 1 | Pending |
+| PDU-04 | Phase 1 | Pending |
+| XPORT-01 | Phase 1 | Pending |
+| XPORT-02 | Phase 1 | Pending |
+| XPORT-03 | Phase 1 | Pending |
+| XPORT-04 | Phase 1 | Pending |
+| LOGIN-01 | Phase 2 | Pending |
+| LOGIN-02 | Phase 2 | Pending |
+| LOGIN-03 | Phase 2 | Pending |
+| LOGIN-04 | Phase 2 | Pending |
+| LOGIN-05 | Phase 2 | Pending |
+| LOGIN-06 | Phase 2 | Pending |
+| SESS-01 | Phase 3 | Pending |
+| SESS-02 | Phase 3 | Pending |
+| SESS-03 | Phase 3 | Pending |
+| SESS-04 | Phase 3 | Pending |
+| SESS-05 | Phase 3 | Pending |
+| READ-01 | Phase 3 | Pending |
+| READ-02 | Phase 3 | Pending |
+| READ-03 | Phase 3 | Pending |
+| WRITE-01 | Phase 4 | Pending |
+| WRITE-02 | Phase 4 | Pending |
+| WRITE-03 | Phase 4 | Pending |
+| WRITE-04 | Phase 4 | Pending |
+| WRITE-05 | Phase 4 | Pending |
+| INTEG-01 | Phase 2 | Pending |
+| INTEG-02 | Phase 2 | Pending |
+| INTEG-03 | Phase 2 | Pending |
+| TMF-01 | Phase 6 | Pending |
+| TMF-02 | Phase 6 | Pending |
+| TMF-03 | Phase 6 | Pending |
+| TMF-04 | Phase 6 | Pending |
+| TMF-05 | Phase 6 | Pending |
+| TMF-06 | Phase 6 | Pending |
+| ERL-01 | Phase 6 | Pending |
+| ERL-02 | Phase 6 | Pending |
+| ERL-03 | Phase 6 | Pending |
+| EVT-01 | Phase 3 | Pending |
+| EVT-02 | Phase 3 | Pending |
+| EVT-03 | Phase 3 | Pending |
+| DISC-01 | Phase 3 | Pending |
+| DISC-02 | Phase 3 | Pending |
+| SCSI-01 | Phase 5 | Pending |
+| SCSI-02 | Phase 5 | Pending |
+| SCSI-03 | Phase 5 | Pending |
+| SCSI-04 | Phase 5 | Pending |
+| SCSI-05 | Phase 5 | Pending |
+| SCSI-06 | Phase 5 | Pending |
+| SCSI-07 | Phase 5 | Pending |
+| SCSI-08 | Phase 5 | Pending |
+| SCSI-09 | Phase 5 | Pending |
+| SCSI-10 | Phase 5 | Pending |
+| SCSI-11 | Phase 5 | Pending |
+| SCSI-12 | Phase 5 | Pending |
+| SCSI-13 | Phase 5 | Pending |
+| SCSI-14 | Phase 5 | Pending |
+| SCSI-15 | Phase 5 | Pending |
+| SCSI-16 | Phase 5 | Pending |
+| SCSI-17 | Phase 5 | Pending |
+| SCSI-18 | Phase 5 | Pending |
+| SCSI-19 | Phase 5 | Pending |
+| API-01 | Phase 7 | Pending |
+| API-02 | Phase 7 | Pending |
+| API-03 | Phase 7 | Pending |
+| API-04 | Phase 7 | Pending |
+| API-05 | Phase 7 | Pending |
+| OBS-01 | Phase 7 | Pending |
+| OBS-02 | Phase 7 | Pending |
+| OBS-03 | Phase 7 | Pending |
+| TEST-01 | Phase 7 | Pending |
+| TEST-02 | Phase 7 | Pending |
+| TEST-03 | Phase 1 | Pending |
+| TEST-04 | Phase 2 | Pending |
+| TEST-05 | Phase 6 | Pending |
+| DOC-01 | Phase 7 | Pending |
+| DOC-02 | Phase 7 | Pending |
+| DOC-03 | Phase 7 | Pending |
+| DOC-04 | Phase 7 | Pending |
+| DOC-05 | Phase 7 | Pending |
 
 **Coverage:**
-- v1 requirements: 72 total
-- Mapped to phases: 0
-- Unmapped: 72 (pending roadmap creation)
+- v1 requirements: 81 total
+- Mapped to phases: 81
+- Unmapped: 0
+
+| Phase | Count | Categories |
+|-------|-------|------------|
+| Phase 1 | 9 | PDU (4), XPORT (4), TEST (1) |
+| Phase 2 | 10 | LOGIN (6), INTEG (3), TEST (1) |
+| Phase 3 | 13 | SESS (5), READ (3), EVT (3), DISC (2) |
+| Phase 4 | 5 | WRITE (5) |
+| Phase 5 | 19 | SCSI (19) |
+| Phase 6 | 10 | ERL (3), TMF (6), TEST (1) |
+| Phase 7 | 15 | API (5), OBS (3), TEST (2), DOC (5) |
 
 ---
 *Requirements defined: 2026-03-31*
-*Last updated: 2026-03-31 after initial definition*
+*Last updated: 2026-03-31 after roadmap creation*
