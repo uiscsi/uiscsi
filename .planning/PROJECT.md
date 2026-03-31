@@ -12,7 +12,9 @@ Full RFC 7143 compliance as a composable Go library — the spec is non-negotiab
 
 ### Validated
 
-(None yet — ship to validate)
+- [x] Header and data digest negotiation and CRC32C verification — Validated in Phase 1: PDU Codec and Transport (CRC32C digest computation with RFC test vectors, padding)
+- [x] PDU binary encoding/decoding for all 24 iSCSI opcodes — Validated in Phase 1: PDU Codec and Transport (BHS marshal/unmarshal, AHS, round-trip tests)
+- [x] TCP transport with concurrent PDU framing — Validated in Phase 1: PDU Codec and Transport (read/write pumps, ITT routing, race-free under -race)
 
 ### Active
 
@@ -86,4 +88,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-31 after initialization*
+*Last updated: 2026-03-31 after Phase 1 completion*
