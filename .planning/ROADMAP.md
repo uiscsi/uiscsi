@@ -48,10 +48,10 @@ Plans:
   3. All RFC 7143 Section 13 mandatory operational parameters are negotiated correctly (HeaderDigest, DataDigest, MaxRecvDataSegmentLength, MaxBurstLength, FirstBurstLength, ImmediateData, InitialR2T, etc.)
   4. When HeaderDigest=CRC32C or DataDigest=CRC32C is negotiated, received PDUs with incorrect digests are detected and rejected
   5. Parameterized tests cover the negotiation parameter matrix (boolean AND/OR, numerical min/max, string list semantics)
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 Plans:
 - [ ] 02-01-PLAN.md — Text codec, negotiation engine, NegotiatedParams, LoginError
-- [ ] 02-02-PLAN.md — CHAP authentication (one-way and mutual)
+- [x] 02-02-PLAN.md — CHAP authentication (one-way and mutual)
 - [ ] 02-03-PLAN.md — Login state machine, functional options, mock target tests, digest activation
 
 ### Phase 3: Session, Read Path, and Discovery
@@ -142,7 +142,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. PDU Codec and Transport | 0/3 | Planning complete | - |
-| 2. Connection and Login | 0/3 | Planning complete | - |
+| 2. Connection and Login | 1/3 | In Progress|  |
 | 3. Session, Read Path, and Discovery | 0/TBD | Not started | - |
 | 4. Write Path | 0/TBD | Not started | - |
 | 5. SCSI Command Layer | 0/TBD | Not started | - |

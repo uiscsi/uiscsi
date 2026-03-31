@@ -26,8 +26,8 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **LOGIN-01**: Full login phase state machine (security negotiation, operational negotiation, leading connection, normal connection)
 - [ ] **LOGIN-02**: Text key-value negotiation engine for all RFC 7143 Section 13 mandatory keys
 - [ ] **LOGIN-03**: AuthMethod=None authentication
-- [ ] **LOGIN-04**: CHAP authentication (one-way: target authenticates initiator)
-- [ ] **LOGIN-05**: Mutual CHAP authentication (bidirectional: both sides authenticate)
+- [x] **LOGIN-04**: CHAP authentication (one-way: target authenticates initiator)
+- [x] **LOGIN-05**: Mutual CHAP authentication (bidirectional: both sides authenticate)
 - [ ] **LOGIN-06**: Operational parameter negotiation (HeaderDigest, DataDigest, MaxRecvDataSegmentLength, MaxBurstLength, FirstBurstLength, InitialR2T, ImmediateData, MaxOutstandingR2T, DataPDUInOrder, DataSequenceInOrder, DefaultTime2Wait, DefaultTime2Retain, MaxConnections, ErrorRecoveryLevel)
 
 ### Session and Command Windowing
@@ -197,8 +197,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LOGIN-01 | Phase 2 | Pending |
 | LOGIN-02 | Phase 2 | Pending |
 | LOGIN-03 | Phase 2 | Pending |
-| LOGIN-04 | Phase 2 | Pending |
-| LOGIN-05 | Phase 2 | Pending |
+| LOGIN-04 | Phase 2 | Complete |
+| LOGIN-05 | Phase 2 | Complete |
 | LOGIN-06 | Phase 2 | Pending |
 | SESS-01 | Phase 3 | Pending |
 | SESS-02 | Phase 3 | Pending |
