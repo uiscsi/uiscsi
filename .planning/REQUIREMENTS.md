@@ -16,10 +16,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Transport
 
-- [ ] **XPORT-01**: TCP connection management with configurable timeouts and context cancellation
-- [ ] **XPORT-02**: PDU framing over TCP (read full BHS, then AHS + data segment based on lengths)
-- [ ] **XPORT-03**: Dedicated read/write goroutine pumps per connection (no concurrent TCP writes)
-- [ ] **XPORT-04**: ITT-based PDU routing/correlation (initiator task tag maps responses to outstanding commands)
+- [x] **XPORT-01**: TCP connection management with configurable timeouts and context cancellation
+- [x] **XPORT-02**: PDU framing over TCP (read full BHS, then AHS + data segment based on lengths)
+- [x] **XPORT-03**: Dedicated read/write goroutine pumps per connection (no concurrent TCP writes)
+- [x] **XPORT-04**: ITT-based PDU routing/correlation (initiator task tag maps responses to outstanding commands)
 
 ### Login and Negotiation
 
@@ -190,10 +190,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PDU-02 | Phase 1 | Complete |
 | PDU-03 | Phase 1 | Complete |
 | PDU-04 | Phase 1 | Complete |
-| XPORT-01 | Phase 1 | Pending |
-| XPORT-02 | Phase 1 | Pending |
-| XPORT-03 | Phase 1 | Pending |
-| XPORT-04 | Phase 1 | Pending |
+| XPORT-01 | Phase 1 | Complete |
+| XPORT-02 | Phase 1 | Complete |
+| XPORT-03 | Phase 1 | Complete |
+| XPORT-04 | Phase 1 | Complete |
 | LOGIN-01 | Phase 2 | Pending |
 | LOGIN-02 | Phase 2 | Pending |
 | LOGIN-03 | Phase 2 | Pending |

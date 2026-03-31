@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-03-31T20:42:55.906Z"
+status: verifying
+stopped_at: Completed 01-03-PLAN.md
+last_updated: "2026-03-31T20:48:58.847Z"
 last_activity: 2026-03-31
 progress:
   total_phases: 7
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 
 Phase: 01 (pdu-codec-and-transport) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-03-31
 
 Progress: [░░░░░░░░░░] 0%
@@ -54,6 +54,7 @@ Progress: [░░░░░░░░░░] 0%
 *Updated after each plan completion*
 | Phase 01 P01 | 3min | 2 tasks | 7 files |
 | Phase 01 P02 | 6min | 2 tasks | 11 files |
+| Phase 01 P03 | 4min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,9 @@ Recent decisions affecting current work:
 - [Phase 01]: Typed PDU per opcode with embedded Header base struct (D-01/D-03 compliance)
 - [Phase 01]: 3-byte manual encoding for DataSegmentLength to avoid TotalAHSLength corruption
 - [Phase 01]: Login PDU byte 1 reuses Final bit position for Transit bit per RFC 7143 Section 11.12
+- [Phase 01]: io.ReadFull exclusively for TCP reads (Pitfall 6), single WritePump goroutine for write serialization (Pitfall 7)
+- [Phase 01]: Size-class buffer pooling (4KB/64KB/16MB) with copy-out ownership model for transport I/O
+- [Phase 01]: Router wraps ITT 0xFFFFFFFE->0x00000000, never allocating reserved 0xFFFFFFFF per RFC 7143
 
 ### Pending Todos
 
@@ -82,6 +86,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-31T20:42:55.895Z
-Stopped at: Completed 01-02-PLAN.md
+Last session: 2026-03-31T20:48:58.836Z
+Stopped at: Completed 01-03-PLAN.md
 Resume file: None
