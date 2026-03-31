@@ -84,11 +84,13 @@ func runMockTarget(t *testing.T, ln net.Listener, cfg mockTargetConfig) {
 				// First CHAP request: send challenge.
 				var idBuf [1]byte
 				if _, err := rand.Read(idBuf[:]); err != nil {
-					t.Fatalf("mock target: rand: %v", err)
+					t.Errorf("mock target: rand: %v", err)
+					return
 				}
 				challenge := make([]byte, 16)
 				if _, err := rand.Read(challenge); err != nil {
-					t.Fatalf("mock target: rand: %v", err)
+					t.Errorf("mock target: rand: %v", err)
+					return
 				}
 
 				respKeys := []KeyValue{
@@ -151,7 +153,8 @@ func runMockTarget(t *testing.T, ln net.Listener, cfg mockTargetConfig) {
 						if cfg.wrongMutualResp {
 							// Send wrong response for testing.
 							if _, err := rand.Read(mutualResp[:]); err != nil {
-								t.Fatalf("mock target: rand: %v", err)
+								t.Errorf("mock target: rand: %v", err)
+								return
 							}
 						} else {
 							mutualResp = chapResponse(byte(iID), []byte(cfg.mutualSecret), iChallenge)
@@ -245,7 +248,8 @@ func sendMockLoginResp(t *testing.T, conn net.Conn, req *pdu.LoginReq, keys []Ke
 
 	encoded, err := pdu.EncodePDU(resp)
 	if err != nil {
-		t.Fatalf("mock target: encode response: %v", err)
+		t.Errorf("mock target: encode response: %v", err)
+		return
 	}
 
 	raw := &transport.RawPDU{}
@@ -261,7 +265,8 @@ func sendMockLoginResp(t *testing.T, conn net.Conn, req *pdu.LoginReq, keys []Ke
 	raw.DataSegment = data
 
 	if err := transport.WriteRawPDU(conn, raw); err != nil {
-		t.Fatalf("mock target: write response: %v", err)
+		t.Errorf("mock target: write response: %v", err)
+		return
 	}
 }
 
