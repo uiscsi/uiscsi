@@ -88,10 +88,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **SCSI-01**: TEST UNIT READY
 - [x] **SCSI-02**: INQUIRY (standard data)
-- [ ] **SCSI-03**: INQUIRY VPD pages (0x00 supported pages, 0x80 serial number, 0x83 device identification)
+- [x] **SCSI-03**: INQUIRY VPD pages (0x00 supported pages, 0x80 serial number, 0x83 device identification)
 - [x] **SCSI-04**: READ CAPACITY (10) and READ CAPACITY (16)
-- [ ] **SCSI-05**: READ (10) and READ (16)
-- [ ] **SCSI-06**: WRITE (10) and WRITE (16)
+- [x] **SCSI-05**: READ (10) and READ (16)
+- [x] **SCSI-06**: WRITE (10) and WRITE (16)
 - [x] **SCSI-07**: REQUEST SENSE
 - [x] **SCSI-08**: REPORT LUNS
 - [x] **SCSI-09**: MODE SENSE (6) and MODE SENSE (10)
@@ -99,15 +99,15 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### SCSI Commands — Extended
 
-- [x] **SCSI-11**: SYNCHRONIZE CACHE (10) and SYNCHRONIZE CACHE (16)
-- [x] **SCSI-12**: WRITE SAME (10) and WRITE SAME (16)
-- [x] **SCSI-13**: UNMAP (thin provisioning / TRIM)
-- [x] **SCSI-14**: VERIFY (10) and VERIFY (16)
-- [x] **SCSI-15**: PERSISTENT RESERVE IN (read reservations/keys)
-- [x] **SCSI-16**: PERSISTENT RESERVE OUT (register, reserve, release, clear, preempt)
-- [x] **SCSI-17**: COMPARE AND WRITE (atomic compare-and-swap at block level)
-- [ ] **SCSI-18**: Extended VPD page parsing (0xB0 block limits, 0xB1 block characteristics, 0xB2 logical block provisioning)
-- [x] **SCSI-19**: START STOP UNIT
+- [ ] **SCSI-11**: SYNCHRONIZE CACHE (10) and SYNCHRONIZE CACHE (16)
+- [ ] **SCSI-12**: WRITE SAME (10) and WRITE SAME (16)
+- [ ] **SCSI-13**: UNMAP (thin provisioning / TRIM)
+- [ ] **SCSI-14**: VERIFY (10) and VERIFY (16)
+- [ ] **SCSI-15**: PERSISTENT RESERVE IN (read reservations/keys)
+- [ ] **SCSI-16**: PERSISTENT RESERVE OUT (register, reserve, release, clear, preempt)
+- [ ] **SCSI-17**: COMPARE AND WRITE (atomic compare-and-swap at block level)
+- [x] **SCSI-18**: Extended VPD page parsing (0xB0 block limits, 0xB1 block characteristics, 0xB2 logical block provisioning)
+- [ ] **SCSI-19**: START STOP UNIT
 
 ### API
 
@@ -232,23 +232,23 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DISC-02 | Phase 3 | Complete |
 | SCSI-01 | Phase 5 | Complete |
 | SCSI-02 | Phase 5 | Complete |
-| SCSI-03 | Phase 5 | Pending |
+| SCSI-03 | Phase 5 | Complete |
 | SCSI-04 | Phase 5 | Complete |
-| SCSI-05 | Phase 5 | Pending |
-| SCSI-06 | Phase 5 | Pending |
+| SCSI-05 | Phase 5 | Complete |
+| SCSI-06 | Phase 5 | Complete |
 | SCSI-07 | Phase 5 | Complete |
 | SCSI-08 | Phase 5 | Complete |
 | SCSI-09 | Phase 5 | Complete |
 | SCSI-10 | Phase 5 | Complete |
-| SCSI-11 | Phase 5 | Complete |
-| SCSI-12 | Phase 5 | Complete |
-| SCSI-13 | Phase 5 | Complete |
-| SCSI-14 | Phase 5 | Complete |
-| SCSI-15 | Phase 5 | Complete |
-| SCSI-16 | Phase 5 | Complete |
-| SCSI-17 | Phase 5 | Complete |
-| SCSI-18 | Phase 5 | Pending |
-| SCSI-19 | Phase 5 | Complete |
+| SCSI-11 | Phase 5 | Pending |
+| SCSI-12 | Phase 5 | Pending |
+| SCSI-13 | Phase 5 | Pending |
+| SCSI-14 | Phase 5 | Pending |
+| SCSI-15 | Phase 5 | Pending |
+| SCSI-16 | Phase 5 | Pending |
+| SCSI-17 | Phase 5 | Pending |
+| SCSI-18 | Phase 5 | Complete |
+| SCSI-19 | Phase 5 | Pending |
 | API-01 | Phase 7 | Pending |
 | API-02 | Phase 7 | Pending |
 | API-03 | Phase 7 | Pending |

@@ -33,6 +33,21 @@ func Inquiry(lun uint64, allocLen uint16) session.Command {
 	return cmd
 }
 
+// InquiryVPD returns an INQUIRY command with EVPD=1 for Vital Product Data
+// pages (opcode 0x12, byte 1 bit 0 set). pageCode selects which VPD page
+// to request.
+func InquiryVPD(lun uint64, pageCode uint8, allocLen uint16) session.Command {
+	var cmd session.Command
+	cmd.CDB[0] = OpInquiry
+	cmd.CDB[1] = 0x01 // EVPD bit
+	cmd.CDB[2] = pageCode
+	binary.BigEndian.PutUint16(cmd.CDB[3:5], allocLen)
+	cmd.Read = true
+	cmd.ExpectedDataTransferLen = uint32(allocLen)
+	cmd.LUN = lun
+	return cmd
+}
+
 // ParseInquiry parses a standard INQUIRY response from a session.Result.
 // Per Pitfall 9: vendor, product, and revision strings are trimmed of
 // trailing spaces.
