@@ -3,10 +3,12 @@ package transport
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"io"
 	"net"
 	"testing"
 
+	"github.com/rkujawa/uiscsi/internal/digest"
 	"github.com/rkujawa/uiscsi/internal/pdu"
 )
 
@@ -300,5 +302,181 @@ func TestFramerWriteRawPDU_WithDigests(t *testing.T) {
 	}
 	if got.DataDigest != 0x55667788 {
 		t.Errorf("data digest: got 0x%08X, want 0x55667788", got.DataDigest)
+	}
+}
+
+// writeRawBytesWithDigests writes a PDU with correct CRC32C digests on the wire.
+func writeRawBytesWithDigests(w io.Writer, bhs [pdu.BHSLength]byte, ahs []byte, data []byte, hdigest, ddigest bool) {
+	w.Write(bhs[:])
+	if len(ahs) > 0 {
+		w.Write(ahs)
+	}
+	if hdigest {
+		input := bhs[:]
+		if len(ahs) > 0 {
+			input = append(bhs[:], ahs...)
+		}
+		var hd [4]byte
+		binary.BigEndian.PutUint32(hd[:], digest.HeaderDigest(input))
+		w.Write(hd[:])
+	}
+	if len(data) > 0 {
+		w.Write(data)
+		padLen := pdu.PadLen(uint32(len(data)))
+		if padLen > 0 {
+			w.Write(make([]byte, padLen))
+		}
+	}
+	if ddigest && len(data) > 0 {
+		var dd [4]byte
+		binary.BigEndian.PutUint32(dd[:], digest.DataDigest(data))
+		w.Write(dd[:])
+	}
+}
+
+func TestFramerReadRawPDU_HeaderDigestMismatch(t *testing.T) {
+	rConn, wConn := net.Pipe()
+	defer rConn.Close()
+	defer wConn.Close()
+
+	bhs := makeBHS(pdu.OpNOPOut, 0, 0)
+
+	go func() {
+		// Write BHS then a wrong header digest
+		wConn.Write(bhs[:])
+		var hd [4]byte
+		binary.BigEndian.PutUint32(hd[:], 0xBAD0BAD0) // wrong digest
+		wConn.Write(hd[:])
+	}()
+
+	_, err := ReadRawPDU(rConn, true, false)
+	if err == nil {
+		t.Fatal("expected error on header digest mismatch")
+	}
+	var de *digest.DigestError
+	if !errors.As(err, &de) {
+		t.Fatalf("expected *digest.DigestError, got %T: %v", err, err)
+	}
+	if de.Type != digest.DigestHeader {
+		t.Errorf("DigestError.Type = %v, want DigestHeader", de.Type)
+	}
+	if de.Actual != 0xBAD0BAD0 {
+		t.Errorf("DigestError.Actual = 0x%08X, want 0xBAD0BAD0", de.Actual)
+	}
+	// Expected should be the real CRC32C of the BHS
+	expected := digest.HeaderDigest(bhs[:])
+	if de.Expected != expected {
+		t.Errorf("DigestError.Expected = 0x%08X, want 0x%08X", de.Expected, expected)
+	}
+}
+
+func TestFramerReadRawPDU_DataDigestMismatch(t *testing.T) {
+	rConn, wConn := net.Pipe()
+	defer rConn.Close()
+	defer wConn.Close()
+
+	data := []byte{0x01, 0x02, 0x03} // 3 bytes, 1 pad
+	bhs := makeBHS(pdu.OpNOPOut, 0, uint32(len(data)))
+
+	go func() {
+		wConn.Write(bhs[:])
+		wConn.Write(data)
+		padLen := pdu.PadLen(uint32(len(data)))
+		if padLen > 0 {
+			wConn.Write(make([]byte, padLen))
+		}
+		var dd [4]byte
+		binary.BigEndian.PutUint32(dd[:], 0xDEAD0000) // wrong digest
+		wConn.Write(dd[:])
+	}()
+
+	_, err := ReadRawPDU(rConn, false, true)
+	if err == nil {
+		t.Fatal("expected error on data digest mismatch")
+	}
+	var de *digest.DigestError
+	if !errors.As(err, &de) {
+		t.Fatalf("expected *digest.DigestError, got %T: %v", err, err)
+	}
+	if de.Type != digest.DigestData {
+		t.Errorf("DigestError.Type = %v, want DigestData", de.Type)
+	}
+	if de.Actual != 0xDEAD0000 {
+		t.Errorf("DigestError.Actual = 0x%08X, want 0xDEAD0000", de.Actual)
+	}
+	expected := digest.DataDigest(data)
+	if de.Expected != expected {
+		t.Errorf("DigestError.Expected = 0x%08X, want 0x%08X", de.Expected, expected)
+	}
+}
+
+func TestFramerReadRawPDU_CorrectDigestsNoError(t *testing.T) {
+	rConn, wConn := net.Pipe()
+	defer rConn.Close()
+	defer wConn.Close()
+
+	data := []byte{0xAA, 0xBB, 0xCC, 0xDD}
+	bhs := makeBHS(pdu.OpNOPOut, 0, uint32(len(data)))
+
+	go writeRawBytesWithDigests(wConn, bhs, nil, data, true, true)
+
+	raw, err := ReadRawPDU(rConn, true, true)
+	if err != nil {
+		t.Fatalf("ReadRawPDU with correct digests: %v", err)
+	}
+	if !bytes.Equal(raw.DataSegment, data) {
+		t.Errorf("data: got %x, want %x", raw.DataSegment, data)
+	}
+}
+
+func TestFramerReadRawPDU_DigestDisabledNoVerify(t *testing.T) {
+	// When digestHeader=false, wrong digest bytes are NOT on the wire,
+	// so no verification happens (existing behavior preserved).
+	rConn, wConn := net.Pipe()
+	defer rConn.Close()
+	defer wConn.Close()
+
+	bhs := makeBHS(pdu.OpNOPOut, 0, 0)
+	go func() {
+		wConn.Write(bhs[:])
+	}()
+
+	raw, err := ReadRawPDU(rConn, false, false)
+	if err != nil {
+		t.Fatalf("ReadRawPDU: %v", err)
+	}
+	if raw.HasHDigest {
+		t.Error("HasHDigest should be false when digestHeader=false")
+	}
+}
+
+func TestFramerReadRawPDU_HeaderDigestMismatchWithAHS(t *testing.T) {
+	rConn, wConn := net.Pipe()
+	defer rConn.Close()
+	defer wConn.Close()
+
+	ahs := []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}
+	bhs := makeBHS(pdu.OpSCSICommand, 2, 0) // 2 words AHS
+
+	go func() {
+		wConn.Write(bhs[:])
+		wConn.Write(ahs)
+		var hd [4]byte
+		binary.BigEndian.PutUint32(hd[:], 0xBAD0BAD0) // wrong digest
+		wConn.Write(hd[:])
+	}()
+
+	_, err := ReadRawPDU(rConn, true, false)
+	if err == nil {
+		t.Fatal("expected error on header digest mismatch with AHS")
+	}
+	var de *digest.DigestError
+	if !errors.As(err, &de) {
+		t.Fatalf("expected *digest.DigestError, got %T: %v", err, err)
+	}
+	// Expected should cover BHS+AHS
+	expected := digest.HeaderDigest(append(bhs[:], ahs...))
+	if de.Expected != expected {
+		t.Errorf("DigestError.Expected = 0x%08X, want 0x%08X", de.Expected, expected)
 	}
 }
