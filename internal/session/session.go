@@ -122,7 +122,7 @@ func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error
 	// Acquire a CmdSN slot (blocks if window is full).
 	cmdSN, err := s.window.acquire(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("session: acquire CmdSN: %w", err)
+		return nil, fmt.Errorf("session: acquire CmdSN (window full): %w", err)
 	}
 
 	// Allocate ITT and register persistent channel.
@@ -190,7 +190,7 @@ func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error
 		s.mu.Lock()
 		delete(s.tasks, itt)
 		s.mu.Unlock()
-		return nil, fmt.Errorf("session: encode SCSICommand: %w", encErr)
+		return nil, fmt.Errorf("session: encode SCSICommand (itt=0x%08x cmd_sn=%d): %w", itt, cmdSN, encErr)
 	}
 
 	raw := &transport.RawPDU{BHS: bhs}
@@ -434,7 +434,7 @@ func (s *Session) taskLoop(tk *task, pduCh <-chan *transport.RawPDU) {
 	for raw := range pduCh {
 		decoded, err := pdu.DecodeBHS(raw.BHS)
 		if err != nil {
-			tk.cancel(fmt.Errorf("session: decode response PDU: %w", err))
+			tk.cancel(fmt.Errorf("session: decode response PDU (itt=0x%08x): %w", tk.itt, err))
 			s.cleanupTask(tk.itt)
 			return
 		}
@@ -474,7 +474,7 @@ func (s *Session) taskLoop(tk *task, pduCh <-chan *transport.RawPDU) {
 			}
 			s.updateStatSN(p.StatSN)
 			if err := tk.handleR2T(p, s.writeCh, s.getExpStatSN, s.params); err != nil {
-				tk.cancel(fmt.Errorf("session: write data: %w", err))
+				tk.cancel(fmt.Errorf("session: write data (itt=0x%08x): %w", tk.itt, err))
 				s.cleanupTask(tk.itt)
 				return
 			}
@@ -501,7 +501,7 @@ func (s *Session) taskLoop(tk *task, pduCh <-chan *transport.RawPDU) {
 
 		default:
 			s.cfg.logger.Warn("session: unexpected PDU for task",
-				"itt", tk.itt,
+				"itt", fmt.Sprintf("0x%08x", tk.itt),
 				"opcode", fmt.Sprintf("0x%02X", raw.BHS[0]&0x3f))
 		}
 	}

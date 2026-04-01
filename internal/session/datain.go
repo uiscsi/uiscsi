@@ -80,13 +80,13 @@ func (t *task) handleDataIn(din *pdu.DataIn) {
 		}
 
 		// ERL 0: fatal gap (existing behavior).
-		err := fmt.Errorf("session: DataSN gap: got %d, want %d", din.DataSN, t.nextDataSN)
+		err := fmt.Errorf("session: DataSN gap (itt=0x%08x got=%d want=%d)", t.itt, din.DataSN, t.nextDataSN)
 		t.resultCh <- Result{Err: err}
 		return
 	}
 
 	if din.BufferOffset != t.nextOffset {
-		err := fmt.Errorf("session: BufferOffset mismatch: got %d, want %d", din.BufferOffset, t.nextOffset)
+		err := fmt.Errorf("session: BufferOffset mismatch (itt=0x%08x got=%d want=%d)", t.itt, din.BufferOffset, t.nextOffset)
 		t.resultCh <- Result{Err: err}
 		return
 	}
