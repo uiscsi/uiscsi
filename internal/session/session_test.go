@@ -232,7 +232,7 @@ func TestSessionConcurrentSubmit(t *testing.T) {
 	}
 	resultsCh := make(chan cmdResult, n)
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		go func(idx int) {
 			cmd := Command{CDB: [16]byte{byte(idx)}}
 			ch, err := sess.Submit(context.Background(), cmd)
@@ -247,7 +247,7 @@ func TestSessionConcurrentSubmit(t *testing.T) {
 	// Process commands one at a time from the target side.
 	// Each response advances the CmdSN window, allowing the next submit to proceed.
 	var allResults []cmdResult
-	for i := 0; i < n; i++ {
+	for i := range n {
 		raw, err := transport.ReadRawPDU(targetConn, false, false)
 		if err != nil {
 			t.Fatalf("read command %d: %v", i, err)
