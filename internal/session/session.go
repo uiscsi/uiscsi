@@ -68,6 +68,7 @@ func NewSession(conn *transport.Conn, params login.NegotiatedParams, opts ...Ses
 	go s.readPumpLoop(ctx)
 	go s.writePumpLoop(ctx)
 	go s.dispatchLoop(ctx)
+	go s.keepaliveLoop(ctx)
 
 	return s
 }
@@ -241,61 +242,18 @@ func (s *Session) dispatchLoop(ctx context.Context) {
 }
 
 // handleUnsolicited processes unsolicited target PDUs (ITT=0xFFFFFFFF).
+// It dispatches to dedicated handlers based on opcode.
 func (s *Session) handleUnsolicited(raw *transport.RawPDU) {
-	decoded, err := pdu.DecodeBHS(raw.BHS)
-	if err != nil {
-		s.cfg.logger.Warn("session: decode unsolicited PDU", "error", err)
-		return
-	}
+	opcode := raw.BHS[0] & 0x3f
 
-	switch p := decoded.(type) {
-	case *pdu.NOPIn:
-		// Update window from NOPIn.
-		s.window.update(p.ExpCmdSN, p.MaxCmdSN)
-		s.updateStatSN(p.StatSN)
-
-		// If TTT != 0xFFFFFFFF, respond with NOP-Out echoing TTT.
-		if p.TargetTransferTag != 0xFFFFFFFF {
-			nopOut := &pdu.NOPOut{
-				Header: pdu.Header{
-					Immediate:        true,
-					Final:            true,
-					InitiatorTaskTag: 0xFFFFFFFF, // unsolicited NOP-Out response
-				},
-				TargetTransferTag: p.TargetTransferTag,
-				CmdSN:             s.window.current(),
-				ExpStatSN:         s.getExpStatSN(),
-			}
-			bhs, encErr := nopOut.MarshalBHS()
-			if encErr != nil {
-				s.cfg.logger.Warn("session: encode NOP-Out", "error", encErr)
-				return
-			}
-			resp := &transport.RawPDU{BHS: bhs}
-			select {
-			case s.writeCh <- resp:
-			default:
-				s.cfg.logger.Warn("session: write channel full, dropping NOP-Out")
-			}
-		}
-
-	case *pdu.AsyncMsg:
-		s.window.update(p.ExpCmdSN, p.MaxCmdSN)
-		s.updateStatSN(p.StatSN)
-		if s.cfg.asyncHandler != nil {
-			s.cfg.asyncHandler(AsyncEvent{
-				EventCode:  p.AsyncEvent,
-				VendorCode: p.AsyncVCode,
-				Parameter1: p.Parameter1,
-				Parameter2: p.Parameter2,
-				Parameter3: p.Parameter3,
-				Data:       p.Data,
-			})
-		}
-
+	switch pdu.OpCode(opcode) {
+	case pdu.OpNOPIn:
+		s.handleUnsolicitedNOPIn(raw)
+	case pdu.OpAsyncMsg:
+		s.handleAsyncMsg(raw)
 	default:
 		s.cfg.logger.Warn("session: unhandled unsolicited PDU",
-			"opcode", fmt.Sprintf("0x%02X", raw.BHS[0]&0x3f))
+			"opcode", fmt.Sprintf("0x%02X", opcode))
 	}
 }
 
