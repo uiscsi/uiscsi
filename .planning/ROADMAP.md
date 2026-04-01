@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 1: PDU Codec and Transport** - Binary PDU encoding/decoding, CRC32C digests, serial number arithmetic, TCP framing, and PDU routing
 - [x] **Phase 2: Connection and Login** - Connection state machine, read/write pumps, login negotiation, authentication, digest and operational parameter negotiation (completed 2026-03-31)
 - [ ] **Phase 3: Session, Read Path, and Discovery** - Session state machine, command windowing, Data-In read path, keepalive, async events, logout, and SendTargets discovery
-- [ ] **Phase 4: Write Path** - R2T handling, Data-Out generation, immediate and unsolicited data, burst length enforcement
+- [x] **Phase 4: Write Path** - R2T handling, Data-Out generation, immediate and unsolicited data, burst length enforcement (completed 2026-04-01)
 - [ ] **Phase 5: SCSI Command Layer** - CDB builders and response parsers for all core and extended SCSI commands, structured sense data parsing
 - [ ] **Phase 6: Error Recovery and Task Management** - ERL 0/1/2 recovery mechanisms and all six task management functions
 - [ ] **Phase 7: Public API, Observability, and Release** - High-level and low-level APIs, observability hooks, integration test suite, documentation, and examples
@@ -80,11 +80,11 @@ Plans:
   3. Unsolicited Data-Out works: when InitialR2T=No, initiator sends data before first R2T, bounded by FirstBurstLength
   4. All four ImmediateData x InitialR2T combinations produce correct wire behavior, verified by parameterized tests
   5. MaxOutstandingR2T is respected and MaxBurstLength is enforced for all solicited data sequences
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 Plans:
 - [x] 04-01-PLAN.md — Command type io.Reader migration, Submit write detection, immediate data
-- [ ] 04-02-PLAN.md — Data-Out engine: R2T handling, solicited/unsolicited Data-Out, MaxBurstLength
-- [ ] 04-03-PLAN.md — Parameterized 2x2 ImmediateData x InitialR2T matrix and edge case tests
+- [x] 04-02-PLAN.md — Data-Out engine: R2T handling, solicited/unsolicited Data-Out, MaxBurstLength
+- [x] 04-03-PLAN.md — Parameterized 2x2 ImmediateData x InitialR2T matrix and edge case tests
 
 ### Phase 5: SCSI Command Layer
 **Goal**: A Go application can issue all core and extended SCSI commands with structured CDB building and response parsing, including sense data interpretation
@@ -144,7 +144,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 1. PDU Codec and Transport | 3/3 | Complete | - |
 | 2. Connection and Login | 3/3 | Complete   | 2026-03-31 |
 | 3. Session, Read Path, and Discovery | 0/3 | Planning complete | - |
-| 4. Write Path | 0/3 | Planning complete | - |
+| 4. Write Path | 3/3 | Complete   | 2026-04-01 |
 | 5. SCSI Command Layer | 0/TBD | Not started | - |
 | 6. Error Recovery and Task Management | 0/TBD | Not started | - |
 | 7. Public API, Observability, and Release | 0/TBD | Not started | - |
