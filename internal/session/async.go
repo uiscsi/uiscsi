@@ -43,11 +43,15 @@ func (s *Session) handleAsyncMsg(raw *transport.RawPDU) {
 	case 2:
 		// Connection drop notification.
 		s.dispatchAsyncEvent(evt)
-		s.mu.Lock()
-		if s.err == nil {
-			s.err = fmt.Errorf("session: target reported connection drop (AsyncEvent 2)")
+		if s.targetAddr != "" {
+			s.triggerReconnect(fmt.Errorf("session: target reported connection drop (AsyncEvent 2)"))
+		} else {
+			s.mu.Lock()
+			if s.err == nil {
+				s.err = fmt.Errorf("session: target reported connection drop (AsyncEvent 2)")
+			}
+			s.mu.Unlock()
 		}
-		s.mu.Unlock()
 
 	case 3:
 		// Session drop notification.

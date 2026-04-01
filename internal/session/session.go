@@ -15,6 +15,14 @@ import (
 	"github.com/rkujawa/uiscsi/internal/transport"
 )
 
+// ErrRetryNotPossible indicates a write command cannot be retried after
+// connection recovery because the io.Reader does not implement io.Seeker.
+var ErrRetryNotPossible = errors.New("session: retry not possible (non-seekable write data)")
+
+// ErrSessionRecovering indicates the session is currently performing
+// ERL 0 reconnection and new commands cannot be submitted.
+var ErrSessionRecovering = errors.New("session: recovery in progress")
+
 // Session represents an iSCSI full-feature-phase session. It wraps a
 // transport.Conn after login, provides CmdSN/MaxCmdSN flow control,
 // dispatches SCSI commands with ITT correlation, and reassembles
@@ -29,10 +37,16 @@ type Session struct {
 
 	window *cmdWindow
 
-	mu        sync.Mutex
-	expStatSN uint32
-	tasks     map[uint32]*task
-	loggedIn  bool // true while session is in full-feature phase
+	mu         sync.Mutex
+	expStatSN  uint32
+	tasks      map[uint32]*task
+	loggedIn   bool // true while session is in full-feature phase
+	recovering bool // true during ERL 0 reconnect, blocks Submit
+
+	// Reconnect context for ERL 0 session reinstatement.
+	targetAddr string
+	isid       [6]byte
+	tsih       uint16
 
 	cancel    context.CancelFunc
 	done      chan struct{}
@@ -54,18 +68,21 @@ func NewSession(conn *transport.Conn, params login.NegotiatedParams, opts ...Ses
 	ctx, cancel := context.WithCancel(context.Background())
 
 	s := &Session{
-		conn:      conn,
-		params:    params,
-		router:    transport.NewRouter(),
-		writeCh:   make(chan *transport.RawPDU, 64),
-		unsolCh:   make(chan *transport.RawPDU, 16),
-		window:    newCmdWindow(params.CmdSN, params.CmdSN, params.CmdSN),
-		expStatSN: params.ExpStatSN,
-		tasks:     make(map[uint32]*task),
-		loggedIn:  true,
-		cancel:    cancel,
-		done:      make(chan struct{}),
-		cfg:       cfg,
+		conn:       conn,
+		params:     params,
+		router:     transport.NewRouter(),
+		writeCh:    make(chan *transport.RawPDU, 64),
+		unsolCh:    make(chan *transport.RawPDU, 16),
+		window:     newCmdWindow(params.CmdSN, params.CmdSN, params.CmdSN),
+		expStatSN:  params.ExpStatSN,
+		tasks:      make(map[uint32]*task),
+		loggedIn:   true,
+		targetAddr: cfg.targetAddr,
+		isid:       params.ISID,
+		tsih:       params.TSIH,
+		cancel:     cancel,
+		done:       make(chan struct{}),
+		cfg:        cfg,
 	}
 
 	// Start background goroutines.
@@ -87,6 +104,14 @@ func (s *Session) Params() login.NegotiatedParams {
 // will receive exactly one Result when the command completes. Submit
 // blocks if the CmdSN window is full, respecting the context deadline.
 func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error) {
+	// Reject new commands during ERL 0 recovery.
+	s.mu.Lock()
+	if s.recovering {
+		s.mu.Unlock()
+		return nil, ErrSessionRecovering
+	}
+	s.mu.Unlock()
+
 	// Acquire a CmdSN slot (blocks if window is full).
 	cmdSN, err := s.window.acquire(ctx)
 	if err != nil {
@@ -106,6 +131,7 @@ func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error
 	// Create task for tracking this command.
 	tk := newTask(itt, cmd.Read, isWrite)
 	tk.lun = cmd.LUN // Store LUN for TMF LUN-based cleanup
+	tk.cmd = cmd      // Store for retry during ERL 0 recovery
 
 	s.mu.Lock()
 	s.tasks[itt] = tk
@@ -263,11 +289,16 @@ func (s *Session) readPumpLoop(ctx context.Context) {
 	err := transport.ReadPump(ctx, s.conn.NetConn(), s.router, s.unsolCh,
 		s.conn.DigestHeader(), s.conn.DigestData())
 	if err != nil && ctx.Err() == nil {
-		s.mu.Lock()
-		if s.err == nil {
-			s.err = fmt.Errorf("session: read pump: %w", err)
+		// If reconnect info is configured, attempt ERL 0 recovery.
+		if s.targetAddr != "" {
+			s.triggerReconnect(fmt.Errorf("session: read pump: %w", err))
+		} else {
+			s.mu.Lock()
+			if s.err == nil {
+				s.err = fmt.Errorf("session: read pump: %w", err)
+			}
+			s.mu.Unlock()
 		}
-		s.mu.Unlock()
 	}
 }
 

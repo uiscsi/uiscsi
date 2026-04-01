@@ -35,6 +35,7 @@ type loginConfig struct {
 	headerDigest []string // preference list
 	dataDigest   []string // preference list
 	isid         [6]byte
+	tsih         uint16
 }
 
 // WithTarget sets the target IQN for the login.
@@ -98,6 +99,15 @@ func WithISID(isid [6]byte) LoginOption {
 	}
 }
 
+// WithTSIH sets the TSIH for session reinstatement during reconnect.
+// A non-zero TSIH tells the target this is a session reinstatement
+// (same ISID, previously negotiated TSIH) per RFC 7143 Section 6.3.5.
+func WithTSIH(tsih uint16) LoginOption {
+	return func(c *loginConfig) {
+		c.tsih = tsih
+	}
+}
+
 // Login performs the iSCSI login phase on an already-established transport
 // connection. It negotiates security (AuthMethod=None or CHAP) and
 // operational parameters, returning the negotiated parameters on success.
@@ -131,6 +141,7 @@ func Login(ctx context.Context, tc *transport.Conn, opts ...LoginOption) (*Negot
 		csg:       stageSecurityNegotiation,
 		cmdSN:     1,
 		expStatSN: 0,
+		tsih:      cfg.tsih,
 		isid:      cfg.isid,
 	}
 
@@ -147,9 +158,10 @@ func Login(ctx context.Context, tc *transport.Conn, opts ...LoginOption) (*Negot
 	tc.SetDigests(ls.params.HeaderDigest, ls.params.DataDigest)
 	tc.SetMaxRecvDSL(ls.params.MaxRecvDataSegmentLength)
 
-	// Hand off post-login sequence numbers to the session layer.
+	// Hand off post-login sequence numbers and session ID to the session layer.
 	ls.params.CmdSN = ls.cmdSN
 	ls.params.ExpStatSN = ls.expStatSN
+	ls.params.ISID = ls.isid
 
 	return ls.params, nil
 }

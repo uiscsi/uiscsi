@@ -8,6 +8,8 @@ import (
 	"io"
 	"log/slog"
 	"time"
+
+	"github.com/rkujawa/uiscsi/internal/login"
 )
 
 // Command represents a SCSI command to be submitted via the session.
@@ -118,6 +120,8 @@ type sessionConfig struct {
 	maxReconnectAttempts int
 	reconnectBackoff     time.Duration
 	snackTimeout         time.Duration
+	targetAddr           string
+	loginOpts            []login.LoginOption
 }
 
 // defaultConfig returns a sessionConfig with sensible defaults.
@@ -182,5 +186,15 @@ func WithReconnectBackoff(base time.Duration) SessionOption {
 func WithSNACKTimeout(d time.Duration) SessionOption {
 	return func(c *sessionConfig) {
 		c.snackTimeout = d
+	}
+}
+
+// WithReconnectInfo configures the session for ERL 0 automatic reconnection.
+// The target address and login options are stored so the session can re-dial
+// and re-login after a connection drop, reinstating with same ISID+TSIH.
+func WithReconnectInfo(addr string, loginOpts ...login.LoginOption) SessionOption {
+	return func(c *sessionConfig) {
+		c.targetAddr = addr
+		c.loginOpts = loginOpts
 	}
 }

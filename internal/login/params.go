@@ -20,6 +20,7 @@ type NegotiatedParams struct {
 	ErrorRecoveryLevel       uint32
 	TargetName               string
 	TSIH                     uint16
+	ISID                     [6]byte
 	CmdSN                    uint32 // Post-login CmdSN for session layer handoff
 	ExpStatSN                uint32 // Post-login ExpStatSN for session layer handoff
 }
