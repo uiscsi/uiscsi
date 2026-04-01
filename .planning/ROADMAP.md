@@ -97,10 +97,10 @@ Plans:
   3. Sense data in both fixed and descriptor formats is parsed with correct sense key, ASC/ASCQ classification
   4. Extended SCSI commands (SYNCHRONIZE CACHE, WRITE SAME, UNMAP, VERIFY, PERSISTENT RESERVE IN/OUT, COMPARE AND WRITE, START STOP UNIT) produce valid CDBs
   5. All CDB builders can be verified with round-trip tests independent of a live iSCSI target
-**Plans:** 3 plans
+**Plans:** 2/3 plans executed
 Plans:
 - [x] 05-01-PLAN.md — Foundation types, sense parsing, core commands (TUR, INQUIRY, READ CAPACITY, REQUEST SENSE, REPORT LUNS, MODE SENSE)
-- [ ] 05-02-PLAN.md — READ/WRITE 10/16 CDB builders and VPD page parsers (0x00, 0x80, 0x83, 0xB0, 0xB1, 0xB2)
+- [x] 05-02-PLAN.md — READ/WRITE 10/16 CDB builders and VPD page parsers (0x00, 0x80, 0x83, 0xB0, 0xB1, 0xB2)
 - [ ] 05-03-PLAN.md — Extended commands (SYNC CACHE, WRITE SAME, UNMAP, VERIFY, PR IN/OUT, COMPARE AND WRITE, START STOP UNIT)
 
 ### Phase 6: Error Recovery and Task Management
@@ -146,6 +146,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 2. Connection and Login | 3/3 | Complete   | 2026-03-31 |
 | 3. Session, Read Path, and Discovery | 0/3 | Planning complete | - |
 | 4. Write Path | 3/4 | Gap closure | 2026-04-01 |
-| 5. SCSI Command Layer | 0/3 | Planning complete | - |
+| 5. SCSI Command Layer | 2/3 | In Progress|  |
 | 6. Error Recovery and Task Management | 0/TBD | Not started | - |
 | 7. Public API, Observability, and Release | 0/TBD | Not started | - |
