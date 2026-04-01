@@ -36,7 +36,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **SESS-02**: CmdSN/ExpCmdSN/MaxCmdSN command windowing and flow control
 - [x] **SESS-03**: StatSN/ExpStatSN tracking per connection
 - [x] **SESS-04**: SCSI Command PDU generation with proper CDB encapsulation
-- [ ] **SESS-05**: NOP-Out/NOP-In keepalive (initiator-originated and target-initiated response)
+- [x] **SESS-05**: NOP-Out/NOP-In keepalive (initiator-originated and target-initiated response)
 
 ### Read Path
 
@@ -75,9 +75,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Events and Logout
 
-- [ ] **EVT-01**: Async message handling (SCSI async event, target-requested logout, connection/session drop notification, vendor-specific)
-- [ ] **EVT-02**: Logout (normal session/connection teardown)
-- [ ] **EVT-03**: Logout for connection recovery (remove connection for recovery)
+- [x] **EVT-01**: Async message handling (SCSI async event, target-requested logout, connection/session drop notification, vendor-specific)
+- [x] **EVT-02**: Logout (normal session/connection teardown)
+- [x] **EVT-03**: Logout for connection recovery (remove connection for recovery)
 
 ### Discovery
 
@@ -204,7 +204,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SESS-02 | Phase 3 | Complete |
 | SESS-03 | Phase 3 | Complete |
 | SESS-04 | Phase 3 | Complete |
-| SESS-05 | Phase 3 | Pending |
+| SESS-05 | Phase 3 | Complete |
 | READ-01 | Phase 3 | Complete |
 | READ-02 | Phase 3 | Complete |
 | READ-03 | Phase 3 | Complete |
@@ -225,9 +225,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ERL-01 | Phase 6 | Pending |
 | ERL-02 | Phase 6 | Pending |
 | ERL-03 | Phase 6 | Pending |
-| EVT-01 | Phase 3 | Pending |
-| EVT-02 | Phase 3 | Pending |
-| EVT-03 | Phase 3 | Pending |
+| EVT-01 | Phase 3 | Complete |
+| EVT-02 | Phase 3 | Complete |
+| EVT-03 | Phase 3 | Complete |
 | DISC-01 | Phase 3 | Pending |
 | DISC-02 | Phase 3 | Pending |
 | SCSI-01 | Phase 5 | Pending |

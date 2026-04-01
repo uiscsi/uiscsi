@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-04-01T07:17:00.164Z"
-last_activity: 2026-03-31
+status: executing
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-04-01T07:28:02.001Z"
+last_activity: 2026-04-01
 progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 9
-  completed_plans: 7
+  completed_plans: 8
   percent: 0
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 ## Current Position
 
 Phase: 3
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-03-31
+Plan: 3 of 3
+Status: Ready to execute
+Last activity: 2026-04-01
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -58,6 +58,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02 P02 | 2min | 1 tasks | 2 files |
 | Phase 02 P03 | 4min | 2 tasks | 2 files |
 | Phase 03 P01 | 12min | 2 tasks | 11 files |
+| Phase 03 P02 | 7min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,8 @@ Recent decisions affecting current work:
 - [Phase 03]: Buffered Data-In reassembly (bytes.Buffer) instead of io.Pipe to avoid deadlock
 - [Phase 03]: Per-task goroutine drains Router channel preventing slow reader from blocking
 - [Phase 03]: Router refactored with routerEntry struct for persistent multi-PDU registrations
+- [Phase 03]: Refactored handleUnsolicited into opcode-based dispatch to dedicated handlers
+- [Phase 03]: Logout() drains tasks before CmdSN acquire; Close() attempts graceful logout with 5s timeout
 
 ### Pending Todos
 
@@ -97,6 +100,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T07:17:00.152Z
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-04-01T07:28:01.990Z
+Stopped at: Completed 03-02-PLAN.md
 Resume file: None
