@@ -35,8 +35,14 @@ func (s *Session) reconnect(cause error) {
 
 	// Step 1: Stop old pumps by cancelling context and closing old connection.
 	// Closing net.Conn unblocks pending Read/Write in pump goroutines.
+	// Capture old done channel to wait for dispatchLoop to exit before
+	// replacing session fields (prevents data race on s.done, s.unsolCh).
+	oldDone := s.done
 	s.cancel()
 	s.conn.Close()
+
+	// Wait for old dispatchLoop to exit so no goroutine reads replaced fields.
+	<-oldDone
 
 	// Step 2: Snapshot in-flight tasks and clear session state.
 	s.mu.Lock()

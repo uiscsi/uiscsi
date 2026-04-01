@@ -234,9 +234,10 @@ func (s *Session) Close() error {
 		s.mu.Lock()
 		wasLoggedIn := s.loggedIn
 		s.loggedIn = false
+		hasErr := s.err != nil
 		s.mu.Unlock()
 
-		if wasLoggedIn && s.err == nil {
+		if wasLoggedIn && !hasErr {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			_ = s.logout(ctx, 0)
 			cancel()
@@ -245,16 +246,18 @@ func (s *Session) Close() error {
 		s.window.close()
 		s.cancel()
 
-		// Cancel all in-flight tasks.
+		// Cancel all in-flight tasks and capture conn under lock
+		// (conn may be replaced by reconnect goroutine).
 		s.mu.Lock()
 		for itt, tk := range s.tasks {
 			tk.cancel(errors.New("session: closed"))
 			s.router.Unregister(itt)
 			delete(s.tasks, itt)
 		}
+		conn := s.conn
 		s.mu.Unlock()
 
-		closeErr = s.conn.Close()
+		closeErr = conn.Close()
 	})
 	return closeErr
 }
