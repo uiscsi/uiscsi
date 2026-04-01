@@ -150,9 +150,9 @@ Plans:
   5. IOL-inspired conformance test suite runs against automated test infrastructure with no manual SAN setup, and godoc plus four worked examples cover discovery, read, write, raw CDB, and error handling
 **Plans:** 3 plans
 Plans:
-- [ ] 07-01-PLAN.md — [to be planned]
-- [ ] 07-02-PLAN.md — [to be planned]
-- [ ] 07-03-PLAN.md — [to be planned]
+- [ ] 07-01-PLAN.md — Public API surface: types, errors, options, Dial/Discover, Session methods, streaming I/O
+- [ ] 07-02-PLAN.md — Mock target infrastructure and IOL-inspired conformance test suite
+- [ ] 07-03-PLAN.md — Documentation: godoc examples, example programs, README
 
 ## Progress
 
@@ -167,4 +167,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 4. Write Path | 3/4 | Gap closure | 2026-04-01 |
 | 5. SCSI Command Layer | 2/3 | In Progress|  |
 | 6. Error Recovery and Task Management | 0/3 | Planning complete | - |
-| 7. Public API, Observability, and Release | 0/TBD | Not started | - |
+| 7. Public API, Observability, and Release | 0/3 | Planning complete | - |
