@@ -119,6 +119,25 @@ Plans:
 - [x] 06-02-PLAN.md — ERL 0: WithTSIH login option, reconnect FSM, session reinstatement, in-flight command retry
 - [ ] 06-03-PLAN.md — ERL 1 SNACK-based retransmission + ERL 2 connection replacement with task reassignment
 
+### Phase 06.1: Observability and Debugging Infrastructure (INSERTED)
+
+**Goal:** Fill all observability gaps so E2E tests can diagnose protocol compliance issues from logs alone — digest verification, PDU tracing, state machine logging, enriched errors, and connection metrics
+**Requirements**: OBS-01, OBS-02, OBS-03
+**Depends on:** Phase 6
+**Success Criteria** (what must be TRUE):
+  1. Received CRC32C digests are verified against computed values; structured errors returned on mismatch
+  2. All 18 PDU types have String() methods producing human-readable dump output
+  3. PDU send/receive hooks (middleware pattern) allow traffic logging in tests
+  4. Errors include CmdSN, StatSN, ITT, and data offsets where applicable
+  5. Login stage transitions, task lifecycle, and command window changes are logged via slog at Debug level
+  6. Connection-level metrics (PDU counts by type, bytes in/out, command latency) are available to consumers
+  7. Full PDU exchanges are traceable at slog Debug level
+**Plans:** 3 plans
+Plans:
+- [ ] 06.1-01-PLAN.md — DigestError type, digest verification in ReadRawPDU, PDU String() methods
+- [ ] 06.1-02-PLAN.md — PDU hooks, metrics events, pump logger injection
+- [ ] 06.1-03-PLAN.md — Structured slog lifecycle logging, enriched errors
+
 ### Phase 7: Public API, Observability, and Release
 **Goal**: Library consumers can use a clean, Go-idiomatic API with both high-level convenience and low-level control, backed by observability and comprehensive documentation
 **Depends on**: Phase 5, Phase 6
