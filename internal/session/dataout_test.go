@@ -729,3 +729,275 @@ func TestWriteMatrix(t *testing.T) {
 		})
 	}
 }
+
+// TestWriteMultiR2TSequence verifies that a write requiring 4 sequential R2Ts
+// produces correct DataSN reset per burst and continuous BufferOffset across
+// R2T sequences.
+func TestWriteMultiR2TSequence(t *testing.T) {
+	params := login.Defaults()
+	params.CmdSN = 1
+	params.ExpStatSN = 1
+	params.ImmediateData = false
+	params.InitialR2T = true
+	params.MaxBurstLength = 2048
+	params.MaxRecvDataSegmentLength = 512
+
+	sess, targetConn := newTestSessionWithParams(t, params)
+
+	writeData := bytes.Repeat([]byte("MNOPQRST"), 1024) // 8192 bytes
+	cmd := Command{
+		ExpectedDataTransferLen: 8192,
+		Data:                    bytes.NewReader(writeData),
+	}
+	cmd.CDB[0] = 0x2A
+
+	resultCh, err := sess.Submit(context.Background(), cmd)
+	if err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+
+	scsiCmd := readSCSICommandPDU(t, targetConn)
+	itt := scsiCmd.InitiatorTaskTag
+	if len(scsiCmd.ImmediateData) != 0 {
+		t.Fatalf("expected no immediate data, got %d bytes", len(scsiCmd.ImmediateData))
+	}
+
+	receivedData := make([]byte, 0, 8192)
+
+	// Send 4 R2Ts, each requesting 2048 bytes.
+	for r2tIdx := range 4 {
+		bufferOffset := uint32(r2tIdx) * 2048
+		writeR2TPDU(t, targetConn, &pdu.R2T{
+			Header:                    pdu.Header{InitiatorTaskTag: itt},
+			TargetTransferTag:         uint32(0xA000 + r2tIdx),
+			StatSN:                    uint32(1 + r2tIdx),
+			ExpCmdSN:                  2,
+			MaxCmdSN:                  10,
+			R2TSN:                     uint32(r2tIdx),
+			BufferOffset:              bufferOffset,
+			DesiredDataTransferLength: 2048,
+		})
+
+		// Each R2T should produce 4 Data-Out PDUs (512 bytes each).
+		for pduIdx := range 4 {
+			dout := readDataOutPDU(t, targetConn)
+
+			// DataSN must reset to 0 for each new R2T response (Pitfall 2).
+			if dout.DataSN != uint32(pduIdx) {
+				t.Fatalf("R2T %d PDU %d: DataSN got %d, want %d", r2tIdx, pduIdx, dout.DataSN, pduIdx)
+			}
+
+			wantOffset := bufferOffset + uint32(pduIdx)*512
+			if dout.BufferOffset != wantOffset {
+				t.Fatalf("R2T %d PDU %d: BufferOffset got %d, want %d", r2tIdx, pduIdx, dout.BufferOffset, wantOffset)
+			}
+
+			if dout.TargetTransferTag != uint32(0xA000+r2tIdx) {
+				t.Fatalf("R2T %d PDU %d: TTT got 0x%08X, want 0x%08X",
+					r2tIdx, pduIdx, dout.TargetTransferTag, 0xA000+r2tIdx)
+			}
+
+			if len(dout.Data) != 512 {
+				t.Fatalf("R2T %d PDU %d: data length got %d, want 512", r2tIdx, pduIdx, len(dout.Data))
+			}
+
+			// Final bit only on last PDU of burst.
+			if pduIdx == 3 && !dout.Header.Final {
+				t.Fatalf("R2T %d PDU %d: Final bit not set on last PDU", r2tIdx, pduIdx)
+			}
+			if pduIdx < 3 && dout.Header.Final {
+				t.Fatalf("R2T %d PDU %d: Final bit should not be set", r2tIdx, pduIdx)
+			}
+
+			receivedData = append(receivedData, dout.Data...)
+		}
+	}
+
+	// Complete.
+	writeSCSIResponsePDU(t, targetConn, &pdu.SCSIResponse{
+		Header:   pdu.Header{InitiatorTaskTag: itt},
+		Status:   0x00,
+		StatSN:   5,
+		ExpCmdSN: 2,
+		MaxCmdSN: 10,
+	})
+
+	result := <-resultCh
+	if result.Err != nil {
+		t.Fatalf("result error: %v", result.Err)
+	}
+	if result.Status != 0x00 {
+		t.Fatalf("status: 0x%02X", result.Status)
+	}
+
+	// Verify complete data integrity.
+	if !bytes.Equal(receivedData, writeData) {
+		t.Fatalf("data mismatch: got %d bytes, want %d bytes", len(receivedData), len(writeData))
+	}
+}
+
+// TestWriteSmallData verifies that writing fewer bytes than MaxRecvDataSegmentLength
+// produces a single Data-Out PDU with Final=true.
+func TestWriteSmallData(t *testing.T) {
+	params := login.Defaults()
+	params.CmdSN = 1
+	params.ExpStatSN = 1
+	params.ImmediateData = false
+	params.InitialR2T = true
+	params.MaxRecvDataSegmentLength = 8192
+	params.MaxBurstLength = 262144
+
+	sess, targetConn := newTestSessionWithParams(t, params)
+
+	writeData := bytes.Repeat([]byte("Z"), 100)
+	cmd := Command{
+		ExpectedDataTransferLen: 100,
+		Data:                    bytes.NewReader(writeData),
+	}
+	cmd.CDB[0] = 0x2A
+
+	resultCh, err := sess.Submit(context.Background(), cmd)
+	if err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+
+	scsiCmd := readSCSICommandPDU(t, targetConn)
+	itt := scsiCmd.InitiatorTaskTag
+	if len(scsiCmd.ImmediateData) != 0 {
+		t.Fatalf("expected no immediate data, got %d bytes", len(scsiCmd.ImmediateData))
+	}
+
+	// Send R2T for 100 bytes.
+	writeR2TPDU(t, targetConn, &pdu.R2T{
+		Header:                    pdu.Header{InitiatorTaskTag: itt},
+		TargetTransferTag:         0xBEEF,
+		StatSN:                    1,
+		ExpCmdSN:                  2,
+		MaxCmdSN:                  10,
+		R2TSN:                     0,
+		BufferOffset:              0,
+		DesiredDataTransferLength: 100,
+	})
+
+	// Expect 1 Data-Out PDU with DataSN=0, Final=true, 100 bytes.
+	dout := readDataOutPDU(t, targetConn)
+	if dout.DataSN != 0 {
+		t.Fatalf("DataSN: got %d, want 0", dout.DataSN)
+	}
+	if !dout.Header.Final {
+		t.Fatal("Final bit not set on single Data-Out PDU")
+	}
+	if dout.TargetTransferTag != 0xBEEF {
+		t.Fatalf("TTT: got 0x%08X, want 0x0000BEEF", dout.TargetTransferTag)
+	}
+	if len(dout.Data) != 100 {
+		t.Fatalf("data length: got %d, want 100", len(dout.Data))
+	}
+	if !bytes.Equal(dout.Data, writeData) {
+		t.Fatal("data content mismatch")
+	}
+
+	writeSCSIResponsePDU(t, targetConn, &pdu.SCSIResponse{
+		Header:   pdu.Header{InitiatorTaskTag: itt},
+		Status:   0x00,
+		StatSN:   2,
+		ExpCmdSN: 2,
+		MaxCmdSN: 10,
+	})
+
+	result := <-resultCh
+	if result.Err != nil {
+		t.Fatalf("result error: %v", result.Err)
+	}
+	if result.Status != 0x00 {
+		t.Fatalf("status: 0x%02X", result.Status)
+	}
+}
+
+// TestWriteExactBurstBoundary verifies that writing exactly MaxBurstLength bytes
+// in one R2T produces the correct number of PDUs with Final only on the last.
+func TestWriteExactBurstBoundary(t *testing.T) {
+	params := login.Defaults()
+	params.CmdSN = 1
+	params.ExpStatSN = 1
+	params.ImmediateData = false
+	params.InitialR2T = true
+	params.MaxBurstLength = 1024
+	params.MaxRecvDataSegmentLength = 512
+
+	sess, targetConn := newTestSessionWithParams(t, params)
+
+	writeData := bytes.Repeat([]byte("X"), 1024)
+	cmd := Command{
+		ExpectedDataTransferLen: 1024,
+		Data:                    bytes.NewReader(writeData),
+	}
+	cmd.CDB[0] = 0x2A
+
+	resultCh, err := sess.Submit(context.Background(), cmd)
+	if err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+
+	scsiCmd := readSCSICommandPDU(t, targetConn)
+	itt := scsiCmd.InitiatorTaskTag
+
+	// Send R2T for 1024 bytes (exactly MaxBurstLength).
+	writeR2TPDU(t, targetConn, &pdu.R2T{
+		Header:                    pdu.Header{InitiatorTaskTag: itt},
+		TargetTransferTag:         0xCAFE,
+		StatSN:                    1,
+		ExpCmdSN:                  2,
+		MaxCmdSN:                  10,
+		R2TSN:                     0,
+		BufferOffset:              0,
+		DesiredDataTransferLength: 1024,
+	})
+
+	// Expect 2 Data-Out PDUs: 512 + 512.
+	receivedData := make([]byte, 0, 1024)
+	for i := range 2 {
+		dout := readDataOutPDU(t, targetConn)
+		if dout.DataSN != uint32(i) {
+			t.Fatalf("PDU %d: DataSN got %d, want %d", i, dout.DataSN, i)
+		}
+		wantOffset := uint32(i) * 512
+		if dout.BufferOffset != wantOffset {
+			t.Fatalf("PDU %d: BufferOffset got %d, want %d", i, dout.BufferOffset, wantOffset)
+		}
+		if dout.TargetTransferTag != 0xCAFE {
+			t.Fatalf("PDU %d: TTT got 0x%08X, want 0x0000CAFE", i, dout.TargetTransferTag)
+		}
+		if len(dout.Data) != 512 {
+			t.Fatalf("PDU %d: data length got %d, want 512", i, len(dout.Data))
+		}
+		// Final only on last PDU.
+		if i == 1 && !dout.Header.Final {
+			t.Fatalf("PDU %d: Final bit not set on last PDU", i)
+		}
+		if i == 0 && dout.Header.Final {
+			t.Fatalf("PDU %d: Final bit should not be set", i)
+		}
+		receivedData = append(receivedData, dout.Data...)
+	}
+
+	if !bytes.Equal(receivedData, writeData) {
+		t.Fatalf("data mismatch: got %d bytes, want %d bytes", len(receivedData), len(writeData))
+	}
+
+	writeSCSIResponsePDU(t, targetConn, &pdu.SCSIResponse{
+		Header:   pdu.Header{InitiatorTaskTag: itt},
+		Status:   0x00,
+		StatSN:   2,
+		ExpCmdSN: 2,
+		MaxCmdSN: 10,
+	})
+
+	result := <-resultCh
+	if result.Err != nil {
+		t.Fatalf("result error: %v", result.Err)
+	}
+	if result.Status != 0x00 {
+		t.Fatalf("status: 0x%02X", result.Status)
+	}
+}
