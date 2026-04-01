@@ -85,8 +85,9 @@ func (s *Session) reconnect(cause error) {
 		}
 
 		// Login with same ISID + old TSIH for session reinstatement (RFC 7143 Section 6.3.5).
-		loginOpts := make([]login.LoginOption, 0, len(s.cfg.loginOpts)+2)
+		loginOpts := make([]login.LoginOption, 0, len(s.cfg.loginOpts)+3)
 		loginOpts = append(loginOpts, login.WithISID(s.isid), login.WithTSIH(s.tsih))
+		loginOpts = append(loginOpts, login.WithLoginLogger(s.cfg.logger))
 		loginOpts = append(loginOpts, s.cfg.loginOpts...)
 
 		params, err := login.Login(ctx, tc, loginOpts...)

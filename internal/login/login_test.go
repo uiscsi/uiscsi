@@ -6,14 +6,57 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/rkujawa/uiscsi/internal/pdu"
 	"github.com/rkujawa/uiscsi/internal/transport"
 )
+
+// captureHandler is a slog.Handler that records all log entries for test assertions.
+type captureHandler struct {
+	mu      sync.Mutex
+	records []slog.Record
+}
+
+func (h *captureHandler) Handle(_ context.Context, r slog.Record) error {
+	h.mu.Lock()
+	h.records = append(h.records, r)
+	h.mu.Unlock()
+	return nil
+}
+
+func (h *captureHandler) Enabled(_ context.Context, _ slog.Level) bool { return true }
+func (h *captureHandler) WithAttrs(_ []slog.Attr) slog.Handler       { return h }
+func (h *captureHandler) WithGroup(_ string) slog.Handler             { return h }
+
+// hasMessage checks if any captured record has the given message substring.
+func (h *captureHandler) hasMessage(msg string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, r := range h.records {
+		if contains(r.Message, msg) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasLevelMessage checks if any captured record has the given level and message substring.
+func (h *captureHandler) hasLevelMessage(level slog.Level, msg string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, r := range h.records {
+		if r.Level == level && contains(r.Message, msg) {
+			return true
+		}
+	}
+	return false
+}
 
 // mockTargetConfig configures the mock iSCSI target for testing.
 type mockTargetConfig struct {
@@ -652,4 +695,97 @@ func searchString(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestLoginStageTransitionLogging(t *testing.T) {
+	t.Parallel()
+
+	addr := startMockTarget(t, mockTargetConfig{
+		authMethod: "None",
+		tsih:       0xAAAA,
+	})
+
+	handler := &captureHandler{}
+	logger := slog.New(handler)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	tc, err := transport.Dial(ctx, addr)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer tc.Close()
+
+	params, err := Login(ctx, tc,
+		WithTarget("iqn.2026-03.com.test:target"),
+		WithLoginLogger(logger),
+	)
+	if err != nil {
+		t.Fatalf("Login: %v", err)
+	}
+	if params == nil {
+		t.Fatal("Login returned nil params")
+	}
+
+	// Verify login start was logged.
+	if !handler.hasLevelMessage(slog.LevelInfo, "login: started") {
+		t.Error("expected Info log with 'login: started'")
+	}
+
+	// Verify security negotiation stage transition was logged.
+	if !handler.hasLevelMessage(slog.LevelInfo, "login: stage transition") {
+		t.Error("expected Info log with 'login: stage transition'")
+	}
+
+	// Verify login complete was logged.
+	if !handler.hasLevelMessage(slog.LevelInfo, "login: complete") {
+		t.Error("expected Info log with 'login: complete'")
+	}
+}
+
+func TestLoginStageTransitionLoggingCHAP(t *testing.T) {
+	t.Parallel()
+
+	addr := startMockTarget(t, mockTargetConfig{
+		authMethod: "CHAP",
+		chapUser:   "initiator",
+		chapSecret: "secret123",
+		tsih:       0xBBBB,
+	})
+
+	handler := &captureHandler{}
+	logger := slog.New(handler)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	tc, err := transport.Dial(ctx, addr)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer tc.Close()
+
+	params, err := Login(ctx, tc,
+		WithTarget("iqn.2026-03.com.test:target"),
+		WithCHAP("initiator", "secret123"),
+		WithLoginLogger(logger),
+	)
+	if err != nil {
+		t.Fatalf("Login: %v", err)
+	}
+	if params == nil {
+		t.Fatal("Login returned nil params")
+	}
+
+	// Verify all stage transitions logged for CHAP path.
+	if !handler.hasLevelMessage(slog.LevelInfo, "login: started") {
+		t.Error("expected Info log with 'login: started'")
+	}
+	if !handler.hasLevelMessage(slog.LevelInfo, "login: stage transition") {
+		t.Error("expected Info log with 'login: stage transition'")
+	}
+	if !handler.hasLevelMessage(slog.LevelInfo, "login: complete") {
+		t.Error("expected Info log with 'login: complete'")
+	}
 }

@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"log/slog"
 	"net"
 	"strings"
 
@@ -36,6 +37,7 @@ type loginConfig struct {
 	dataDigest   []string // preference list
 	isid         [6]byte
 	tsih         uint16 // non-zero for session reinstatement
+	logger       *slog.Logger
 }
 
 // WithTarget sets the target IQN for the login.
@@ -99,6 +101,13 @@ func WithISID(isid [6]byte) LoginOption {
 	}
 }
 
+// WithLoginLogger overrides the default slog.Logger for login diagnostics.
+func WithLoginLogger(l *slog.Logger) LoginOption {
+	return func(c *loginConfig) {
+		c.logger = l
+	}
+}
+
 // WithTSIH sets the TSIH for session reinstatement during reconnect.
 // A non-zero TSIH tells the target this is a session reinstatement
 // (same ISID, previously negotiated TSIH) per RFC 7143 Section 6.3.5.
@@ -125,6 +134,11 @@ func Login(ctx context.Context, tc *transport.Conn, opts ...LoginOption) (*Negot
 		o(cfg)
 	}
 
+	// Default logger if none provided.
+	if cfg.logger == nil {
+		cfg.logger = slog.Default()
+	}
+
 	// Generate random ISID if not provided (type 0x40 = random per RFC 7143 Section 11.12.5).
 	var zeroISID [6]byte
 	if cfg.isid == zeroISID {
@@ -143,6 +157,7 @@ func Login(ctx context.Context, tc *transport.Conn, opts ...LoginOption) (*Negot
 		expStatSN: 0,
 		isid:      cfg.isid,
 		tsih:      cfg.tsih,
+		logger:    cfg.logger,
 	}
 
 	// Initialize CHAP state if credentials provided.
@@ -177,10 +192,15 @@ type loginState struct {
 	expStatSN uint32     // tracks target's StatSN (Pitfall 9)
 	tsih      uint16     // 0 for new session
 	isid      [6]byte
+	logger    *slog.Logger
 }
 
 // run drives the login state machine through SecurityNeg -> OperationalNeg -> FullFeature.
 func (ls *loginState) run(ctx context.Context) error {
+	ls.logger.Info("login: started",
+		"target", ls.cfg.targetName,
+		"session_type", ls.cfg.sessionType)
+
 	// Stage 0: Security Negotiation
 	if err := ls.doSecurityNegotiation(ctx); err != nil {
 		return err
@@ -191,11 +211,19 @@ func (ls *loginState) run(ctx context.Context) error {
 		return err
 	}
 
+	ls.logger.Info("login: complete",
+		"header_digest", ls.params.HeaderDigest,
+		"data_digest", ls.params.DataDigest)
+
 	return nil
 }
 
 // doSecurityNegotiation performs stage 0 (security negotiation).
 func (ls *loginState) doSecurityNegotiation(ctx context.Context) error {
+	ls.logger.Info("login: stage transition",
+		"from", "start",
+		"to", "security_negotiation")
+
 	if ls.chap == nil {
 		// AuthMethod=None: single PDU, transit to operational.
 		keys := []KeyValue{
@@ -221,11 +249,18 @@ func (ls *loginState) doSecurityNegotiation(ctx context.Context) error {
 
 		// If target says transit to FFP directly (no operational stage), handle it.
 		if resp.Transit && resp.NSG == stageFullFeaturePhase {
+			ls.logger.Info("login: stage transition",
+				"from", "security_negotiation",
+				"to", "full_feature_phase",
+				"skipped", "operational_negotiation")
 			*ls.params = Defaults()
 			ls.params.TSIH = resp.TSIH
 			ls.params.TargetName = ls.cfg.targetName
 			return nil
 		}
+		ls.logger.Info("login: stage transition",
+			"from", "security_negotiation",
+			"to", "operational_negotiation")
 		return nil
 	}
 
@@ -291,17 +326,29 @@ func (ls *loginState) doSecurityNegotiation(ctx context.Context) error {
 
 	// If target says transit to FFP directly, handle it.
 	if resp.Transit && resp.NSG == stageFullFeaturePhase {
+		ls.logger.Info("login: stage transition",
+			"from", "security_negotiation",
+			"to", "full_feature_phase",
+			"skipped", "operational_negotiation")
 		*ls.params = Defaults()
 		ls.params.TSIH = resp.TSIH
 		ls.params.TargetName = ls.cfg.targetName
 		return nil
 	}
 
+	ls.logger.Info("login: stage transition",
+		"from", "security_negotiation",
+		"to", "operational_negotiation")
+
 	return nil
 }
 
 // doOperationalNegotiation performs stage 1 (operational parameter negotiation).
 func (ls *loginState) doOperationalNegotiation(ctx context.Context) error {
+	ls.logger.Info("login: stage transition",
+		"from", "operational_negotiation",
+		"to", "full_feature_phase")
+
 	// Start with defaults.
 	*ls.params = Defaults()
 
