@@ -81,8 +81,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Discovery
 
-- [ ] **DISC-01**: SendTargets discovery (discovery session type, text request/response for target enumeration)
-- [ ] **DISC-02**: Target and LUN enumeration from discovery results
+- [x] **DISC-01**: SendTargets discovery (discovery session type, text request/response for target enumeration)
+- [x] **DISC-02**: Target and LUN enumeration from discovery results
 
 ### SCSI Commands — Core
 
@@ -228,8 +228,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EVT-01 | Phase 3 | Complete |
 | EVT-02 | Phase 3 | Complete |
 | EVT-03 | Phase 3 | Complete |
-| DISC-01 | Phase 3 | Pending |
-| DISC-02 | Phase 3 | Pending |
+| DISC-01 | Phase 3 | Complete |
+| DISC-02 | Phase 3 | Complete |
 | SCSI-01 | Phase 5 | Pending |
 | SCSI-02 | Phase 5 | Pending |
 | SCSI-03 | Phase 5 | Pending |
