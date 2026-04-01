@@ -22,6 +22,8 @@ Full RFC 7143 compliance as a composable Go library — the spec is non-negotiab
 
 - [x] SCSI write command submission with immediate data, R2T handling, Data-Out generation, and burst length enforcement — Validated in Phase 4: Write Path (Command.Data io.Reader, R2T/Data-Out engine, 2x2 ImmediateData x InitialR2T matrix tests)
 
+- [x] All 19 SCSI commands with typed CDB builders and response parsers — Validated in Phase 5: SCSI Command Layer (TEST UNIT READY through START STOP UNIT, sense data parsing, VPD pages, 100+ subtests)
+
 ### Active
 
 - [ ] SendTargets discovery to enumerate available targets and LUNs
@@ -90,4 +92,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-01 after Phase 4 completion*
+*Last updated: 2026-04-01 after Phase 5 completion*
