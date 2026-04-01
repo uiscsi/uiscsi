@@ -82,7 +82,7 @@ Plans:
   5. MaxOutstandingR2T is respected and MaxBurstLength is enforced for all solicited data sequences
 **Plans:** 3 plans
 Plans:
-- [ ] 04-01-PLAN.md — Command type io.Reader migration, Submit write detection, immediate data
+- [x] 04-01-PLAN.md — Command type io.Reader migration, Submit write detection, immediate data
 - [ ] 04-02-PLAN.md — Data-Out engine: R2T handling, solicited/unsolicited Data-Out, MaxBurstLength
 - [ ] 04-03-PLAN.md — Parameterized 2x2 ImmediateData x InitialR2T matrix and edge case tests
 

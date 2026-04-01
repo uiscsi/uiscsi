@@ -48,7 +48,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **WRITE-01**: R2T (Ready to Transfer) handling with R2TSN tracking and MaxOutstandingR2T compliance
 - [ ] **WRITE-02**: Solicited Data-Out PDU generation in response to R2T
-- [ ] **WRITE-03**: Immediate data support (write data piggybacked on SCSI Command PDU, bounded by FirstBurstLength)
+- [x] **WRITE-03**: Immediate data support (write data piggybacked on SCSI Command PDU, bounded by FirstBurstLength)
 - [ ] **WRITE-04**: Unsolicited Data-Out when InitialR2T=No (before first R2T, bounded by FirstBurstLength)
 - [ ] **WRITE-05**: MaxBurstLength enforcement for solicited data sequences
 
@@ -210,7 +210,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | READ-03 | Phase 3 | Complete |
 | WRITE-01 | Phase 4 | Pending |
 | WRITE-02 | Phase 4 | Pending |
-| WRITE-03 | Phase 4 | Pending |
+| WRITE-03 | Phase 4 | Complete |
 | WRITE-04 | Phase 4 | Pending |
 | WRITE-05 | Phase 4 | Pending |
 | INTEG-01 | Phase 2 | Complete |
