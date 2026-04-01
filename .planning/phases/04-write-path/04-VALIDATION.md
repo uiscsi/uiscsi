@@ -38,12 +38,13 @@ created: 2026-04-01
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 04-01-01 | 01 | 1 | WRITE-01 | unit | `go test ./internal/session/ -run TestR2T` | ❌ W0 | ⬜ pending |
-| 04-01-02 | 01 | 1 | WRITE-02 | unit | `go test ./internal/session/ -run TestDataOut` | ❌ W0 | ⬜ pending |
-| 04-02-01 | 02 | 1 | WRITE-03 | unit | `go test ./internal/session/ -run TestImmediate` | ❌ W0 | ⬜ pending |
-| 04-02-02 | 02 | 1 | WRITE-04 | unit | `go test ./internal/session/ -run TestUnsolicited` | ❌ W0 | ⬜ pending |
-| 04-03-01 | 03 | 2 | WRITE-05 | unit | `go test ./internal/session/ -run TestBurst` | ❌ W0 | ⬜ pending |
-| 04-03-02 | 03 | 2 | ALL | integration | `go test -race ./internal/session/ -run TestWriteMatrix` | ❌ W0 | ⬜ pending |
+| 04-01-01 | 01 | 1 | WRITE-03 | unit | `go test ./internal/session/ -run TestImmediate` | ❌ W0 | ⬜ pending |
+| 04-01-02 | 01 | 1 | WRITE-03 | unit | `go test ./internal/session/ -run TestSubmitWrite` | ❌ W0 | ⬜ pending |
+| 04-01-03 | 01 | 1 | WRITE-03 | unit | `go test ./internal/session/ -run TestWriteResult` | ❌ W0 | ⬜ pending |
+| 04-02-01 | 02 | 2 | WRITE-01, WRITE-02, WRITE-04, WRITE-05 | unit | `go test ./internal/session/ -run TestR2T` | ❌ W0 | ⬜ pending |
+| 04-02-02 | 02 | 2 | WRITE-01, WRITE-04 | unit | `go test ./internal/session/ -run TestUnsolicited` | ❌ W0 | ⬜ pending |
+| 04-03-01 | 03 | 3 | ALL | integration | `go test -race ./internal/session/ -run TestWriteMatrix` | ❌ W0 | ⬜ pending |
+| 04-03-02 | 03 | 3 | WRITE-05 | integration | `go test -race ./internal/session/ -run TestBurst` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -51,7 +52,7 @@ created: 2026-04-01
 
 ## Wave 0 Requirements
 
-- [ ] `internal/session/write_test.go` — stubs for WRITE-01 through WRITE-05
+- [ ] `internal/session/dataout_test.go` — stubs for WRITE-01 through WRITE-05
 - [ ] Existing test infrastructure covers framework needs (go test, testing/synctest)
 
 *Existing infrastructure covers all phase requirements.*
