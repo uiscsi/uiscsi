@@ -20,6 +20,8 @@ Full RFC 7143 compliance as a composable Go library — the spec is non-negotiab
 - [x] iSCSI text negotiation for all mandatory keys (RFC 7143 Section 13) — Validated in Phase 2: Connection and Login (declarative key registry, 14 mandatory keys, parameterized tests)
 - [x] Header and data digest negotiation and CRC32C verification — Validated in Phase 2: Connection and Login (digest negotiation during login, SetDigests activation post-login)
 
+- [x] SCSI write command submission with immediate data, R2T handling, Data-Out generation, and burst length enforcement — Validated in Phase 4: Write Path (Command.Data io.Reader, R2T/Data-Out engine, 2x2 ImmediateData x InitialR2T matrix tests)
+
 ### Active
 
 - [ ] SendTargets discovery to enumerate available targets and LUNs
@@ -88,4 +90,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-01 after Phase 2 completion*
+*Last updated: 2026-04-01 after Phase 4 completion*
