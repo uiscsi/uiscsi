@@ -92,4 +92,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-01 after Phase 6 completion — error recovery (ERL 0/1/2) and task management functions implemented*
+*Last updated: 2026-04-01 after Phase 06.1 completion — observability and debugging infrastructure (digest verification, PDU stringers, hooks, metrics, structured logging, enriched errors)*
