@@ -576,3 +576,156 @@ func TestWriteReaderError(t *testing.T) {
 func containsString(s, substr string) bool {
 	return len(s) >= len(substr) && bytes.Contains([]byte(s), []byte(substr))
 }
+
+// TestWriteMatrix is a parameterized 2x2 test covering all four combinations
+// of ImmediateData x InitialR2T. Each sub-test verifies correct wire behavior:
+// immediate data presence/absence, unsolicited Data-Out, solicited R2T handling,
+// and byte-level data integrity.
+func TestWriteMatrix(t *testing.T) {
+	// Test data: 2048 bytes to write.
+	writeData := bytes.Repeat([]byte("ABCDEFGH"), 256) // 2048 bytes
+
+	tests := []struct {
+		name          string
+		immediateData bool
+		initialR2T    bool
+	}{
+		{"ImmData=true_InitR2T=true", true, true},
+		{"ImmData=true_InitR2T=false", true, false},
+		{"ImmData=false_InitR2T=true", false, true},
+		{"ImmData=false_InitR2T=false", false, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			params := login.Defaults()
+			params.CmdSN = 1
+			params.ExpStatSN = 1
+			params.ImmediateData = tt.immediateData
+			params.InitialR2T = tt.initialR2T
+			params.FirstBurstLength = 1024
+			params.MaxRecvDataSegmentLength = 512
+			params.MaxBurstLength = 2048
+
+			sess, targetConn := newTestSessionWithParams(t, params)
+
+			cmd := Command{
+				ExpectedDataTransferLen: uint32(len(writeData)),
+				Data:                    bytes.NewReader(writeData),
+			}
+			cmd.CDB[0] = 0x2A // WRITE(10)
+
+			resultCh, err := sess.Submit(context.Background(), cmd)
+			if err != nil {
+				t.Fatalf("Submit: %v", err)
+			}
+
+			// Phase 1: Read SCSICommand.
+			scsiCmd := readSCSICommandPDU(t, targetConn)
+			if !scsiCmd.Write {
+				t.Fatal("W-bit not set")
+			}
+
+			receivedData := make([]byte, 0, len(writeData))
+			offset := uint32(0)
+
+			// Collect immediate data if expected.
+			if tt.immediateData {
+				immLen := min(params.FirstBurstLength, params.MaxRecvDataSegmentLength)
+				if len(scsiCmd.ImmediateData) == 0 {
+					t.Fatal("expected immediate data")
+				}
+				if uint32(len(scsiCmd.ImmediateData)) > immLen {
+					t.Fatalf("immediate data %d exceeds limit %d", len(scsiCmd.ImmediateData), immLen)
+				}
+				receivedData = append(receivedData, scsiCmd.ImmediateData...)
+				offset += uint32(len(scsiCmd.ImmediateData))
+			} else {
+				if len(scsiCmd.ImmediateData) > 0 {
+					t.Fatalf("unexpected immediate data: %d bytes", len(scsiCmd.ImmediateData))
+				}
+			}
+
+			// Phase 2: Read unsolicited Data-Out if InitialR2T=No.
+			if !tt.initialR2T {
+				unsolRemaining := params.FirstBurstLength - offset
+				for unsolRemaining > 0 {
+					dout := readDataOutPDU(t, targetConn)
+					if dout.TargetTransferTag != 0xFFFFFFFF {
+						t.Fatalf("unsolicited TTT: got 0x%08X, want 0xFFFFFFFF", dout.TargetTransferTag)
+					}
+					if dout.BufferOffset != offset {
+						t.Fatalf("unsolicited offset: got %d, want %d", dout.BufferOffset, offset)
+					}
+					receivedData = append(receivedData, dout.Data...)
+					offset += uint32(len(dout.Data))
+					unsolRemaining -= uint32(len(dout.Data))
+					if dout.Header.Final {
+						break
+					}
+				}
+			}
+
+			// Phase 3: Send R2T for remaining data, collect solicited Data-Out.
+			remaining := uint32(len(writeData)) - offset
+			r2tSN := uint32(0)
+			ttt := uint32(0x5678)
+			for remaining > 0 {
+				desired := min(remaining, params.MaxBurstLength)
+				writeR2TPDU(t, targetConn, &pdu.R2T{
+					Header:                    pdu.Header{InitiatorTaskTag: scsiCmd.InitiatorTaskTag},
+					TargetTransferTag:         ttt,
+					StatSN:                    uint32(1 + r2tSN),
+					ExpCmdSN:                  2,
+					MaxCmdSN:                  10,
+					R2TSN:                     r2tSN,
+					BufferOffset:              offset,
+					DesiredDataTransferLength: desired,
+				})
+
+				burstReceived := uint32(0)
+				for burstReceived < desired {
+					dout := readDataOutPDU(t, targetConn)
+					if dout.TargetTransferTag != ttt {
+						t.Fatalf("solicited TTT: got 0x%08X, want 0x%08X", dout.TargetTransferTag, ttt)
+					}
+					if dout.BufferOffset != offset+burstReceived {
+						t.Fatalf("solicited offset: got %d, want %d", dout.BufferOffset, offset+burstReceived)
+					}
+					receivedData = append(receivedData, dout.Data...)
+					burstReceived += uint32(len(dout.Data))
+					if dout.Header.Final {
+						break
+					}
+				}
+
+				offset += burstReceived
+				remaining -= burstReceived
+				r2tSN++
+				ttt++
+			}
+
+			// Phase 4: Send SCSIResponse.
+			writeSCSIResponsePDU(t, targetConn, &pdu.SCSIResponse{
+				Header:   pdu.Header{InitiatorTaskTag: scsiCmd.InitiatorTaskTag},
+				Status:   0x00,
+				StatSN:   uint32(1 + r2tSN),
+				ExpCmdSN: 2,
+				MaxCmdSN: 10,
+			})
+
+			result := <-resultCh
+			if result.Err != nil {
+				t.Fatalf("result error: %v", result.Err)
+			}
+			if result.Status != 0x00 {
+				t.Fatalf("status: 0x%02X", result.Status)
+			}
+
+			// Verify all data received correctly.
+			if !bytes.Equal(receivedData, writeData) {
+				t.Fatalf("data mismatch: got %d bytes, want %d bytes", len(receivedData), len(writeData))
+			}
+		})
+	}
+}
