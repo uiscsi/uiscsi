@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/rkujawa/uiscsi/internal/login"
 	"github.com/rkujawa/uiscsi/internal/pdu"
@@ -30,6 +31,7 @@ type Session struct {
 	mu        sync.Mutex
 	expStatSN uint32
 	tasks     map[uint32]*task
+	loggedIn  bool // true while session is in full-feature phase
 
 	cancel    context.CancelFunc
 	done      chan struct{}
@@ -59,6 +61,7 @@ func NewSession(conn *transport.Conn, params login.NegotiatedParams, opts ...Ses
 		window:    newCmdWindow(params.CmdSN, params.CmdSN, params.CmdSN),
 		expStatSN: params.ExpStatSN,
 		tasks:     make(map[uint32]*task),
+		loggedIn:  true,
 		cancel:    cancel,
 		done:      make(chan struct{}),
 		cfg:       cfg,
@@ -153,11 +156,24 @@ func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error
 	return tk.resultCh, nil
 }
 
-// Close shuts down the session: stops accepting commands, cancels
-// background goroutines, and closes the transport connection.
+// Close shuts down the session. If the session is still logged in, it
+// attempts a graceful Logout PDU exchange with a short timeout before
+// force-closing. Close is idempotent via sync.Once.
 func (s *Session) Close() error {
 	var closeErr error
 	s.closeOnce.Do(func() {
+		// Attempt graceful logout if still logged in.
+		s.mu.Lock()
+		wasLoggedIn := s.loggedIn
+		s.loggedIn = false
+		s.mu.Unlock()
+
+		if wasLoggedIn && s.err == nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_ = s.logout(ctx, 0)
+			cancel()
+		}
+
 		s.window.close()
 		s.cancel()
 

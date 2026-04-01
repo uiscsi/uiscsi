@@ -78,13 +78,10 @@ func (s *Session) logout(ctx context.Context, reasonCode uint8) error {
 	}
 }
 
-// Logout performs a graceful session logout. It stops accepting new commands,
-// waits for in-flight commands to complete, then exchanges Logout/LogoutResp
-// PDUs with the target. Per RFC 7143 Section 11.14.
+// Logout performs a graceful session logout. It waits for in-flight
+// commands to complete, then exchanges Logout/LogoutResp PDUs with the
+// target before shutting down. Per RFC 7143 Section 11.14.
 func (s *Session) Logout(ctx context.Context) error {
-	// Prevent new Submit calls by closing the command window.
-	s.window.close()
-
 	// Wait for all in-flight tasks to drain (or timeout).
 	drainCtx, drainCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer drainCancel()
@@ -108,12 +105,16 @@ func (s *Session) Logout(ctx context.Context) error {
 		}
 	}
 
-	// Perform the Logout PDU exchange.
+	// Perform the Logout PDU exchange (needs CmdSN from window).
 	if err := s.logout(ctx, 0); err != nil {
 		return err
 	}
 
-	// Close session internals.
+	// Mark session as logged out, close window, and stop goroutines.
+	s.mu.Lock()
+	s.loggedIn = false
+	s.mu.Unlock()
+	s.window.close()
 	s.cancel()
 	return nil
 }
