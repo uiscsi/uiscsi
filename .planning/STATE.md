@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 6 context gathered
-last_updated: "2026-04-01T15:10:59.331Z"
+stopped_at: Completed 06-03-PLAN.md
+last_updated: "2026-04-01T16:29:13.255Z"
 last_activity: 2026-04-01
 progress:
   total_phases: 7
   completed_phases: 5
-  total_plans: 16
-  completed_plans: 16
+  total_plans: 19
+  completed_plans: 17
   percent: 0
 ---
 
@@ -64,6 +64,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P03 | 9min | 2 tasks | 1 files |
 | Phase 05 P01 | 6min | 2 tasks | 11 files |
 | Phase 05 P02 | 4min | 2 tasks | 5 files |
+| Phase 06 P03 | 9min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -103,6 +104,9 @@ Recent decisions affecting current work:
 - [Phase 05]: CDB builder pattern: plain functions return session.Command with packed CDB bytes
 - [Phase 05]: VPD 0x83 page length from bytes 2-3 as BigEndian.Uint16 (unlike 0x00/0x80 single-byte)
 - [Phase 05]: Association field is bits 5-4 of VPD 0x83 descriptor byte 1 (2-bit field)
+- [Phase 06]: SNACK uses task's own ITT per RFC 7143 Section 11.16 (Pitfall 4)
+- [Phase 06]: startPumps captures conn/channels locally to prevent race during connection replacement
+- [Phase 06]: ERL 2 Logout failure is non-fatal (target may have cleaned up old connection)
 
 ### Pending Todos
 
@@ -115,6 +119,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T15:10:59.319Z
-Stopped at: Phase 6 context gathered
-Resume file: .planning/phases/06-error-recovery-and-task-management/06-CONTEXT.md
+Last session: 2026-04-01T16:29:13.244Z
+Stopped at: Completed 06-03-PLAN.md
+Resume file: None

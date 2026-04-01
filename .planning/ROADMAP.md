@@ -115,7 +115,7 @@ Plans:
   5. Error injection tests verify recovery behavior under simulated connection failures, timeout scenarios, and digest errors
 **Plans:** 3 plans
 Plans:
-- [ ] 06-01-PLAN.md — faultConn test utility, TMF types and constants, all six TMF methods with auto-cleanup
+- [x] 06-01-PLAN.md — faultConn test utility, TMF types and constants, all six TMF methods with auto-cleanup
 - [ ] 06-02-PLAN.md — ERL 0: WithTSIH login option, reconnect FSM, session reinstatement, in-flight command retry
 - [ ] 06-03-PLAN.md — ERL 1 SNACK-based retransmission + ERL 2 connection replacement with task reassignment
 
