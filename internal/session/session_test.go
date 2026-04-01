@@ -26,6 +26,7 @@ func newTestSession(t *testing.T) (*Session, net.Conn) {
 
 	sess := NewSession(tc, params)
 	t.Cleanup(func() {
+		go respondToLogout(targetConn)
 		sess.Close()
 		targetConn.Close()
 	})
@@ -69,6 +70,39 @@ func buildRawPDU(t *testing.T, p pdu.PDU) *transport.RawPDU {
 		raw.DataSegment = ds
 	}
 	return raw
+}
+
+// respondToLogout reads PDUs from the target conn and auto-responds to a
+// Logout request with a successful LogoutResp. This lets Close() complete
+// a real graceful logout instead of waiting 5s for a response that never
+// comes. Any non-Logout PDUs (e.g., NOP-Out keepalives) are silently
+// consumed. Returns when the conn is closed or after responding to Logout.
+func respondToLogout(conn net.Conn) {
+	for {
+		raw, err := transport.ReadRawPDU(conn, false, false)
+		if err != nil {
+			return
+		}
+		opcode := pdu.OpCode(raw.BHS[0] & 0x3f)
+		if opcode != pdu.OpLogoutReq {
+			continue
+		}
+		itt := binary.BigEndian.Uint32(raw.BHS[16:20])
+		resp := &pdu.LogoutResp{
+			Header: pdu.Header{
+				OpCode_:          pdu.OpLogoutResp,
+				Final:            true,
+				InitiatorTaskTag: itt,
+			},
+			Response: 0,
+		}
+		bhs, err := resp.MarshalBHS()
+		if err != nil {
+			return
+		}
+		_ = transport.WriteRawPDU(conn, &transport.RawPDU{BHS: bhs})
+		return
+	}
 }
 
 // readSCSICommandPDU reads and decodes a SCSICommand PDU from the target conn.

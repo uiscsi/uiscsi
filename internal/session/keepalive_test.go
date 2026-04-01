@@ -23,6 +23,7 @@ func newTestSessionWithOptions(t *testing.T, opts ...SessionOption) (*Session, n
 
 	sess := NewSession(tc, params, opts...)
 	t.Cleanup(func() {
+		go respondToLogout(targetConn)
 		sess.Close()
 		targetConn.Close()
 	})

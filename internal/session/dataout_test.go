@@ -19,6 +19,7 @@ func newTestSessionWithParams(t *testing.T, params login.NegotiatedParams) (*Ses
 	tc := transport.NewConnFromNetConn(clientConn)
 	sess := NewSession(tc, params)
 	t.Cleanup(func() {
+		go respondToLogout(targetConn)
 		sess.Close()
 		targetConn.Close()
 	})
