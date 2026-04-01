@@ -115,9 +115,9 @@ Plans:
   5. Error injection tests verify recovery behavior under simulated connection failures, timeout scenarios, and digest errors
 **Plans:** 3 plans
 Plans:
-- [ ] 06-01-PLAN.md — [to be planned]
-- [ ] 06-02-PLAN.md — [to be planned]
-- [ ] 06-03-PLAN.md — [to be planned]
+- [ ] 06-01-PLAN.md — faultConn test utility, TMF types and constants, all six TMF methods with auto-cleanup
+- [ ] 06-02-PLAN.md — ERL 0: WithTSIH login option, reconnect FSM, session reinstatement, in-flight command retry
+- [ ] 06-03-PLAN.md — ERL 1 SNACK-based retransmission + ERL 2 connection replacement with task reassignment
 
 ### Phase 7: Public API, Observability, and Release
 **Goal**: Library consumers can use a clean, Go-idiomatic API with both high-level convenience and low-level control, backed by observability and comprehensive documentation
@@ -147,5 +147,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 3. Session, Read Path, and Discovery | 0/3 | Planning complete | - |
 | 4. Write Path | 3/4 | Gap closure | 2026-04-01 |
 | 5. SCSI Command Layer | 2/3 | In Progress|  |
-| 6. Error Recovery and Task Management | 0/TBD | Not started | - |
+| 6. Error Recovery and Task Management | 0/3 | Planning complete | - |
 | 7. Public API, Observability, and Release | 0/TBD | Not started | - |
