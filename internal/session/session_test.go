@@ -4,14 +4,74 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"io"
+	"log/slog"
 	"net"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/rkujawa/uiscsi/internal/digest"
 	"github.com/rkujawa/uiscsi/internal/login"
 	"github.com/rkujawa/uiscsi/internal/pdu"
 	"github.com/rkujawa/uiscsi/internal/transport"
 )
+
+// captureHandler is a slog.Handler that records all log entries for test assertions.
+type captureHandler struct {
+	mu      sync.Mutex
+	records []slog.Record
+}
+
+func (h *captureHandler) Handle(_ context.Context, r slog.Record) error {
+	h.mu.Lock()
+	h.records = append(h.records, r)
+	h.mu.Unlock()
+	return nil
+}
+
+func (h *captureHandler) Enabled(_ context.Context, _ slog.Level) bool { return true }
+func (h *captureHandler) WithAttrs(_ []slog.Attr) slog.Handler       { return h }
+func (h *captureHandler) WithGroup(_ string) slog.Handler             { return h }
+
+// hasMessage checks if any captured record has the given message substring.
+func (h *captureHandler) hasMessage(msg string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, r := range h.records {
+		if containsStr(r.Message, msg) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasLevelMessage checks if any captured record has the given level and message substring.
+func (h *captureHandler) hasLevelMessage(level slog.Level, msg string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, r := range h.records {
+		if r.Level == level && containsStr(r.Message, msg) {
+			return true
+		}
+	}
+	return false
+}
+
+// containsStr is a simple substring check.
+func containsStr(s, substr string) bool {
+	return len(s) >= len(substr) && searchStr(s, substr)
+}
+
+func searchStr(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
 
 // newTestSession creates a Session backed by a net.Pipe for testing.
 // Returns the session and the "target" side of the pipe for sending responses.
@@ -400,5 +460,109 @@ func TestSessionSubmitWriteImmediateData(t *testing.T) {
 	}
 	if result.Data != nil {
 		t.Fatal("Data should be nil for write command result")
+	}
+}
+
+func TestDigestErrorConnectionFatal(t *testing.T) {
+	clientConn, targetConn := net.Pipe()
+
+	// Create transport.Conn with header digest enabled so ReadPump expects
+	// a 4-byte header digest after BHS.
+	tc := transport.NewConnFromNetConn(clientConn)
+	tc.SetDigests(true, false) // header digest on, data digest off
+
+	handler := &captureHandler{}
+	logger := slog.New(handler)
+
+	params := login.Defaults()
+	params.CmdSN = 1
+	params.ExpStatSN = 1
+
+	// Create session WITH reconnect info to verify DigestError does NOT reconnect.
+	sess := NewSession(tc, params,
+		WithLogger(logger),
+		WithReconnectInfo("127.0.0.1:9999"), // dummy addr
+	)
+
+	// Write a BHS with a wrong header digest from the target side.
+	// This will cause ReadPump to get a DigestError.
+	go func() {
+		// Build a NOP-In PDU BHS (48 bytes) + wrong 4-byte header digest.
+		var bhs [pdu.BHSLength]byte
+		bhs[0] = byte(pdu.OpNOPIn) | 0x40 // opcode + reserved bit
+		bhs[1] = 0x80                      // Final=1
+		// ITT = 0xFFFFFFFF (unsolicited)
+		binary.BigEndian.PutUint32(bhs[16:20], 0xFFFFFFFF)
+		// DataSegmentLength = 0 (no data segment, no data digest)
+
+		// Write BHS
+		targetConn.Write(bhs[:])
+		// Write wrong header digest (all zeros, will not match CRC32C of BHS)
+		targetConn.Write([]byte{0x00, 0x00, 0x00, 0x00})
+	}()
+
+	// Wait for the session to detect the error.
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case <-deadline:
+			t.Fatal("timed out waiting for session to detect digest error")
+		default:
+		}
+		if err := sess.Err(); err != nil {
+			// Verify the error wraps DigestError.
+			var de *digest.DigestError
+			if !errors.As(err, &de) {
+				t.Fatalf("session error should wrap *digest.DigestError, got: %v", err)
+			}
+			if de.Type != digest.DigestHeader {
+				t.Fatalf("digest type: got %v, want DigestHeader", de.Type)
+			}
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Verify the Warn log was emitted.
+	if !handler.hasLevelMessage(slog.LevelWarn, "session: digest mismatch") {
+		t.Error("expected Warn log with 'session: digest mismatch'")
+	}
+
+	// Verify no reconnect was attempted (session should NOT have logged reconnect start).
+	if handler.hasMessage("session: reconnect started") {
+		t.Error("DigestError should not trigger reconnect (connection-fatal per D-03)")
+	}
+
+	// Cleanup.
+	sess.Close()
+	targetConn.Close()
+}
+
+func TestSessionLifecycleLogging(t *testing.T) {
+	clientConn, targetConn := net.Pipe()
+
+	tc := transport.NewConnFromNetConn(clientConn)
+	handler := &captureHandler{}
+	logger := slog.New(handler)
+
+	params := login.Defaults()
+	params.CmdSN = 1
+	params.ExpStatSN = 1
+
+	sess := NewSession(tc, params, WithLogger(logger))
+
+	// Verify "session: opened" was logged.
+	if !handler.hasLevelMessage(slog.LevelInfo, "session: opened") {
+		t.Error("expected Info log with 'session: opened' after NewSession")
+	}
+
+	// Close session.
+	go respondToLogout(targetConn)
+	sess.Close()
+	targetConn.Close()
+
+	// Verify "session: closing" was logged.
+	if !handler.hasLevelMessage(slog.LevelInfo, "session: closing") {
+		t.Error("expected Info log with 'session: closing' after Close")
 	}
 }

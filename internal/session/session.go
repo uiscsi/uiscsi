@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rkujawa/uiscsi/internal/digest"
 	"github.com/rkujawa/uiscsi/internal/login"
 	"github.com/rkujawa/uiscsi/internal/pdu"
 	"github.com/rkujawa/uiscsi/internal/serial"
@@ -86,6 +87,11 @@ func NewSession(conn *transport.Conn, params login.NegotiatedParams, opts ...Ses
 		isid:       params.ISID,
 		tsih:       params.TSIH,
 	}
+
+	s.cfg.logger.Info("session: opened",
+		"isid", fmt.Sprintf("%x", params.ISID),
+		"tsih", params.TSIH,
+		"max_cmd_sn", params.CmdSN)
 
 	// Start background goroutines. Capture conn/channels locally so
 	// replaceConnection can safely replace s.conn/s.writeCh/s.unsolCh
@@ -238,6 +244,9 @@ func (s *Session) Close() error {
 		hasErr := s.err != nil
 		s.mu.Unlock()
 
+		s.cfg.logger.Info("session: closing",
+			"was_logged_in", wasLoggedIn)
+
 		if wasLoggedIn && !hasErr {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			_ = s.logout(ctx, 0)
@@ -342,7 +351,23 @@ func (s *Session) readPumpLoop(ctx context.Context, conn *transport.Conn, unsolC
 		conn.DigestHeader(), conn.DigestData(),
 		s.cfg.logger, s.pduHookBridge())
 	if err != nil && ctx.Err() == nil {
-		// If reconnect info is configured, attempt ERL 0 recovery.
+		// DigestError is connection-fatal at ERL 0 (per RFC 7143 Section 7.3
+		// and D-03). Do NOT attempt reconnect -- the connection data is corrupt.
+		var de *digest.DigestError
+		if errors.As(err, &de) {
+			s.cfg.logger.Warn("session: digest mismatch, dropping connection (per D-03)",
+				"digest_type", de.Type.String(),
+				"expected", fmt.Sprintf("0x%08X", de.Expected),
+				"actual", fmt.Sprintf("0x%08X", de.Actual))
+			s.mu.Lock()
+			if s.err == nil {
+				s.err = fmt.Errorf("session: digest mismatch (connection fatal): %w", err)
+			}
+			s.mu.Unlock()
+			return
+		}
+
+		// Non-digest errors: attempt ERL 0 recovery if configured.
 		if s.targetAddr != "" {
 			s.triggerReconnect(fmt.Errorf("session: read pump: %w", err))
 		} else {
@@ -360,6 +385,9 @@ func (s *Session) writePumpLoop(ctx context.Context, conn *transport.Conn, write
 	err := transport.WritePump(ctx, conn.NetConn(), writeCh,
 		s.cfg.logger, s.pduHookBridge())
 	if err != nil && ctx.Err() == nil {
+		s.cfg.logger.Error("session: fatal error",
+			"source", "write_pump",
+			"error", err.Error())
 		s.mu.Lock()
 		if s.err == nil {
 			s.err = fmt.Errorf("session: write pump: %w", err)
@@ -414,7 +442,13 @@ func (s *Session) taskLoop(tk *task, pduCh <-chan *transport.RawPDU) {
 		switch p := decoded.(type) {
 		case *pdu.DataIn:
 			p.Data = raw.DataSegment
+			oldMax := s.window.maxCmdSNValue()
 			s.window.update(p.ExpCmdSN, p.MaxCmdSN)
+			if s.window.maxCmdSNValue() != oldMax {
+				s.cfg.logger.Info("session: command window updated",
+					"exp_cmd_sn", p.ExpCmdSN,
+					"max_cmd_sn", p.MaxCmdSN)
+			}
 			if p.HasStatus {
 				s.updateStatSN(p.StatSN)
 			}
@@ -431,7 +465,13 @@ func (s *Session) taskLoop(tk *task, pduCh <-chan *transport.RawPDU) {
 			}
 
 		case *pdu.R2T:
+			oldMax := s.window.maxCmdSNValue()
 			s.window.update(p.ExpCmdSN, p.MaxCmdSN)
+			if s.window.maxCmdSNValue() != oldMax {
+				s.cfg.logger.Info("session: command window updated",
+					"exp_cmd_sn", p.ExpCmdSN,
+					"max_cmd_sn", p.MaxCmdSN)
+			}
 			s.updateStatSN(p.StatSN)
 			if err := tk.handleR2T(p, s.writeCh, s.getExpStatSN, s.params); err != nil {
 				tk.cancel(fmt.Errorf("session: write data: %w", err))
@@ -441,7 +481,13 @@ func (s *Session) taskLoop(tk *task, pduCh <-chan *transport.RawPDU) {
 
 		case *pdu.SCSIResponse:
 			p.Data = raw.DataSegment
+			oldMax := s.window.maxCmdSNValue()
 			s.window.update(p.ExpCmdSN, p.MaxCmdSN)
+			if s.window.maxCmdSNValue() != oldMax {
+				s.cfg.logger.Info("session: command window updated",
+					"exp_cmd_sn", p.ExpCmdSN,
+					"max_cmd_sn", p.MaxCmdSN)
+			}
 			s.updateStatSN(p.StatSN)
 			tk.handleSCSIResponse(p)
 			if s.cfg.metricsHook != nil {

@@ -139,3 +139,11 @@ func (w *cmdWindow) current() uint32 {
 	defer w.mu.Unlock()
 	return w.cmdSN
 }
+
+// maxCmdSNValue returns the current MaxCmdSN. Used for logging
+// command window changes.
+func (w *cmdWindow) maxCmdSNValue() uint32 {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.maxCmdSN
+}

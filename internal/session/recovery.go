@@ -23,6 +23,9 @@ func (s *Session) triggerReconnect(cause error) {
 	}
 	s.recovering = true
 	s.mu.Unlock()
+	s.cfg.logger.Info("session: reconnect started",
+		"target", s.targetAddr,
+		"cause", cause.Error())
 	go s.reconnect(cause)
 }
 
@@ -104,6 +107,9 @@ func (s *Session) reconnect(cause error) {
 
 	if newConn == nil {
 		// All attempts exhausted.
+		s.cfg.logger.Warn("session: reconnect failed",
+			"attempts", s.cfg.maxReconnectAttempts,
+			"error", lastErr.Error())
 		s.mu.Lock()
 		s.err = fmt.Errorf("session: reconnect failed after %d attempts: %w",
 			s.cfg.maxReconnectAttempts, lastErr)
@@ -150,7 +156,8 @@ func (s *Session) reconnect(cause error) {
 	s.recovering = false
 	s.mu.Unlock()
 
-	s.cfg.logger.Info("session: ERL 0 recovery complete")
+	s.cfg.logger.Info("session: reconnect complete",
+		"new_tsih", newParams.TSIH)
 }
 
 // retryTasks resubmits in-flight tasks that were captured before reconnect.
