@@ -175,8 +175,21 @@ func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error
 		return nil, ctx.Err()
 	}
 
-	// Transfer io.Reader ownership to task goroutine for R2T handling.
+	// Transfer io.Reader ownership to task for R2T handling.
 	tk.reader = cmd.Data
+
+	// Send unsolicited Data-Out when InitialR2T=No (per D-04, WRITE-04).
+	// This runs synchronously in Submit so the io.Reader is not yet shared
+	// with the task goroutine (Pitfall 6: no concurrent reads).
+	if isWrite && !s.params.InitialR2T {
+		if err := tk.sendUnsolicitedDataOut(s.writeCh, s.getExpStatSN, s.params); err != nil {
+			s.router.Unregister(itt)
+			s.mu.Lock()
+			delete(s.tasks, itt)
+			s.mu.Unlock()
+			return nil, fmt.Errorf("session: unsolicited data: %w", err)
+		}
+	}
 
 	// Start per-task goroutine to drain PDU channel.
 	go s.taskLoop(tk, pduCh)
@@ -321,6 +334,15 @@ func (s *Session) taskLoop(tk *task, pduCh <-chan *transport.RawPDU) {
 			}
 			tk.handleDataIn(p)
 			if p.HasStatus {
+				s.cleanupTask(tk.itt)
+				return
+			}
+
+		case *pdu.R2T:
+			s.window.update(p.ExpCmdSN, p.MaxCmdSN)
+			s.updateStatSN(p.StatSN)
+			if err := tk.handleR2T(p, s.writeCh, s.getExpStatSN, s.params); err != nil {
+				tk.cancel(fmt.Errorf("session: write data: %w", err))
 				s.cleanupTask(tk.itt)
 				return
 			}
