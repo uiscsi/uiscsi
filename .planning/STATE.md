@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: Phase 3 context gathered
-last_updated: "2026-04-01T06:39:41.293Z"
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-04-01T07:17:00.164Z"
 last_activity: 2026-03-31
 progress:
   total_phases: 7
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 9
+  completed_plans: 7
   percent: 0
 ---
 
@@ -57,6 +57,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P03 | 4min | 2 tasks | 9 files |
 | Phase 02 P02 | 2min | 1 tasks | 2 files |
 | Phase 02 P03 | 4min | 2 tasks | 2 files |
+| Phase 03 P01 | 12min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -81,6 +82,9 @@ Recent decisions affecting current work:
 - [Phase 02]: Synchronous PDU exchange via raw net.Conn during login (not pumps)
 - [Phase 02]: buildInitiatorKeys in login.go for login-specific key proposal construction
 - [Phase 02]: Mock target uses loopback TCP for realistic login integration testing
+- [Phase 03]: Buffered Data-In reassembly (bytes.Buffer) instead of io.Pipe to avoid deadlock
+- [Phase 03]: Per-task goroutine drains Router channel preventing slow reader from blocking
+- [Phase 03]: Router refactored with routerEntry struct for persistent multi-PDU registrations
 
 ### Pending Todos
 
@@ -93,6 +97,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T06:39:41.282Z
-Stopped at: Phase 3 context gathered
-Resume file: .planning/phases/03-session-read-path-and-discovery/03-CONTEXT.md
+Last session: 2026-04-01T07:17:00.152Z
+Stopped at: Completed 03-01-PLAN.md
+Resume file: None

@@ -32,17 +32,17 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Session and Command Windowing
 
-- [ ] **SESS-01**: Session state machine per RFC 7143 connection/session model
-- [ ] **SESS-02**: CmdSN/ExpCmdSN/MaxCmdSN command windowing and flow control
-- [ ] **SESS-03**: StatSN/ExpStatSN tracking per connection
-- [ ] **SESS-04**: SCSI Command PDU generation with proper CDB encapsulation
+- [x] **SESS-01**: Session state machine per RFC 7143 connection/session model
+- [x] **SESS-02**: CmdSN/ExpCmdSN/MaxCmdSN command windowing and flow control
+- [x] **SESS-03**: StatSN/ExpStatSN tracking per connection
+- [x] **SESS-04**: SCSI Command PDU generation with proper CDB encapsulation
 - [ ] **SESS-05**: NOP-Out/NOP-In keepalive (initiator-originated and target-initiated response)
 
 ### Read Path
 
-- [ ] **READ-01**: Data-In PDU handling with sequence number validation and data offset tracking
-- [ ] **READ-02**: Multi-PDU read reassembly (gathering Data-In PDUs into complete read response)
-- [ ] **READ-03**: Status delivery via Data-In with S-bit or separate SCSI Response PDU
+- [x] **READ-01**: Data-In PDU handling with sequence number validation and data offset tracking
+- [x] **READ-02**: Multi-PDU read reassembly (gathering Data-In PDUs into complete read response)
+- [x] **READ-03**: Status delivery via Data-In with S-bit or separate SCSI Response PDU
 
 ### Write Path
 
@@ -200,14 +200,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LOGIN-04 | Phase 2 | Complete |
 | LOGIN-05 | Phase 2 | Complete |
 | LOGIN-06 | Phase 2 | Pending |
-| SESS-01 | Phase 3 | Pending |
-| SESS-02 | Phase 3 | Pending |
-| SESS-03 | Phase 3 | Pending |
-| SESS-04 | Phase 3 | Pending |
+| SESS-01 | Phase 3 | Complete |
+| SESS-02 | Phase 3 | Complete |
+| SESS-03 | Phase 3 | Complete |
+| SESS-04 | Phase 3 | Complete |
 | SESS-05 | Phase 3 | Pending |
-| READ-01 | Phase 3 | Pending |
-| READ-02 | Phase 3 | Pending |
-| READ-03 | Phase 3 | Pending |
+| READ-01 | Phase 3 | Complete |
+| READ-02 | Phase 3 | Complete |
+| READ-03 | Phase 3 | Complete |
 | WRITE-01 | Phase 4 | Pending |
 | WRITE-02 | Phase 4 | Pending |
 | WRITE-03 | Phase 4 | Pending |

@@ -66,7 +66,7 @@ Plans:
   5. Graceful logout tears down the session cleanly, and async messages from the target (including target-requested logout) are handled
 **Plans:** 3 plans
 Plans:
-- [ ] 03-01-PLAN.md — Session core: types, CmdSN windowing, Submit, Data-In reassembly
+- [x] 03-01-PLAN.md — Session core: types, CmdSN windowing, Submit, Data-In reassembly
 - [ ] 03-02-PLAN.md — Keepalive, async events, logout
 - [ ] 03-03-PLAN.md — SendTargets discovery and Discover convenience function
 
