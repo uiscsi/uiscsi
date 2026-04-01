@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -96,20 +97,44 @@ func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error
 	itt := s.router.AllocateITT()
 	pduCh := s.router.RegisterPersistent(itt)
 
+	// Auto-detect write commands from Data io.Reader.
+	isWrite := cmd.Data != nil
+	if isWrite {
+		cmd.Write = true // Auto-set W-bit per RFC 7143
+	}
+
 	// Create task for tracking this command.
-	tk := newTask(itt, cmd.Read)
+	tk := newTask(itt, cmd.Read, isWrite)
 
 	s.mu.Lock()
 	s.tasks[itt] = tk
 	expStatSN := s.expStatSN
 	s.mu.Unlock()
 
+	// Read immediate data from io.Reader when ImmediateData=Yes.
+	var immediateData []byte
+	if isWrite && s.params.ImmediateData {
+		immLen := min(s.params.FirstBurstLength, s.params.MaxRecvDataSegmentLength)
+		immBuf := make([]byte, immLen)
+		n, readErr := io.ReadFull(cmd.Data, immBuf)
+		if readErr != nil && readErr != io.ErrUnexpectedEOF {
+			// Reader failed before we could read immediate data.
+			s.router.Unregister(itt)
+			s.mu.Lock()
+			delete(s.tasks, itt)
+			s.mu.Unlock()
+			return nil, fmt.Errorf("session: read immediate data: %w", readErr)
+		}
+		immediateData = immBuf[:n]
+		tk.bytesSent = uint32(n) // Track for unsolicited/R2T offset
+	}
+
 	// Build SCSICommand PDU.
 	scsiCmd := &pdu.SCSICommand{
 		Header: pdu.Header{
 			Final:            true,
 			InitiatorTaskTag: itt,
-			DataSegmentLen:   uint32(len(cmd.ImmediateData)),
+			DataSegmentLen:   uint32(len(immediateData)),
 		},
 		Read:                       cmd.Read,
 		Write:                      cmd.Write,
@@ -118,7 +143,7 @@ func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error
 		CmdSN:                      cmdSN,
 		ExpStatSN:                  expStatSN,
 		CDB:                        cmd.CDB,
-		ImmediateData:              cmd.ImmediateData,
+		ImmediateData:              immediateData,
 	}
 
 	// Set LUN in header.
@@ -135,8 +160,8 @@ func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error
 	}
 
 	raw := &transport.RawPDU{BHS: bhs}
-	if len(cmd.ImmediateData) > 0 {
-		raw.DataSegment = cmd.ImmediateData
+	if len(immediateData) > 0 {
+		raw.DataSegment = immediateData
 	}
 
 	// Send to write pump.
@@ -149,6 +174,9 @@ func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error
 		s.mu.Unlock()
 		return nil, ctx.Err()
 	}
+
+	// Transfer io.Reader ownership to task goroutine for R2T handling.
+	tk.reader = cmd.Data
 
 	// Start per-task goroutine to drain PDU channel.
 	go s.taskLoop(tk, pduCh)
