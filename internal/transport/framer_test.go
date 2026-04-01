@@ -134,7 +134,7 @@ func TestFramerReadRawPDU_HeaderDigest(t *testing.T) {
 	defer wConn.Close()
 
 	bhs := makeBHS(pdu.OpNOPOut, 0, 0)
-	go writeRawBytes(wConn, bhs, nil, nil, true, false)
+	go writeRawBytesWithDigests(wConn, bhs, nil, nil, true, false)
 
 	raw, err := ReadRawPDU(rConn, true, false)
 	if err != nil {
@@ -143,8 +143,9 @@ func TestFramerReadRawPDU_HeaderDigest(t *testing.T) {
 	if !raw.HasHDigest {
 		t.Error("expected HasHDigest=true")
 	}
-	if raw.HeaderDigest != 0xDEADBEEF {
-		t.Errorf("header digest: got 0x%08X, want 0xDEADBEEF", raw.HeaderDigest)
+	expected := digest.HeaderDigest(bhs[:])
+	if raw.HeaderDigest != expected {
+		t.Errorf("header digest: got 0x%08X, want 0x%08X", raw.HeaderDigest, expected)
 	}
 }
 
@@ -156,7 +157,7 @@ func TestFramerReadRawPDU_DataDigest(t *testing.T) {
 	data := []byte{0x01, 0x02, 0x03} // 3 bytes, 1 pad
 	bhs := makeBHS(pdu.OpNOPOut, 0, uint32(len(data)))
 
-	go writeRawBytes(wConn, bhs, nil, data, false, true)
+	go writeRawBytesWithDigests(wConn, bhs, nil, data, false, true)
 
 	raw, err := ReadRawPDU(rConn, false, true)
 	if err != nil {
@@ -165,8 +166,9 @@ func TestFramerReadRawPDU_DataDigest(t *testing.T) {
 	if !raw.HasDDigest {
 		t.Error("expected HasDDigest=true")
 	}
-	if raw.DataDigest != 0xCAFEBABE {
-		t.Errorf("data digest: got 0x%08X, want 0xCAFEBABE", raw.DataDigest)
+	expected := digest.DataDigest(data)
+	if raw.DataDigest != expected {
+		t.Errorf("data digest: got 0x%08X, want 0x%08X", raw.DataDigest, expected)
 	}
 }
 
@@ -278,11 +280,15 @@ func TestFramerWriteRawPDU_WithDigests(t *testing.T) {
 	data := []byte{0xAB, 0xCD}
 	bhs := makeBHS(pdu.OpNOPOut, 0, uint32(len(data)))
 
+	// Use real CRC32C digests so verification passes on read-back.
+	hd := digest.HeaderDigest(bhs[:])
+	dd := digest.DataDigest(data)
+
 	original := &RawPDU{
 		BHS:          bhs,
 		DataSegment:  data,
-		HeaderDigest: 0x11223344,
-		DataDigest:   0x55667788,
+		HeaderDigest: hd,
+		DataDigest:   dd,
 		HasHDigest:   true,
 		HasDDigest:   true,
 	}
@@ -297,11 +303,11 @@ func TestFramerWriteRawPDU_WithDigests(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadRawPDU: %v", err)
 	}
-	if got.HeaderDigest != 0x11223344 {
-		t.Errorf("header digest: got 0x%08X, want 0x11223344", got.HeaderDigest)
+	if got.HeaderDigest != hd {
+		t.Errorf("header digest: got 0x%08X, want 0x%08X", got.HeaderDigest, hd)
 	}
-	if got.DataDigest != 0x55667788 {
-		t.Errorf("data digest: got 0x%08X, want 0x55667788", got.DataDigest)
+	if got.DataDigest != dd {
+		t.Errorf("data digest: got 0x%08X, want 0x%08X", got.DataDigest, dd)
 	}
 }
 

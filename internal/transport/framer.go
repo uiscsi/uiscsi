@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"io"
 
+	"github.com/rkujawa/uiscsi/internal/digest"
 	"github.com/rkujawa/uiscsi/internal/pdu"
 )
 
@@ -93,6 +94,38 @@ func ReadRawPDU(r io.Reader, digestHeader, digestData bool) (*RawPDU, error) {
 		if digestData {
 			raw.DataDigest = binary.BigEndian.Uint32(payload[off : off+4])
 			raw.HasDDigest = true
+		}
+	}
+
+	// Stage 6: Verify digests before returning.
+	if digestHeader {
+		var input []byte
+		if len(raw.AHS) > 0 {
+			input = make([]byte, pdu.BHSLength+len(raw.AHS))
+			copy(input, raw.BHS[:])
+			copy(input[pdu.BHSLength:], raw.AHS)
+		} else {
+			input = raw.BHS[:]
+		}
+		expected := digest.HeaderDigest(input)
+		if expected != raw.HeaderDigest {
+			PutBuffer(payload)
+			return nil, &digest.DigestError{
+				Type:     digest.DigestHeader,
+				Expected: expected,
+				Actual:   raw.HeaderDigest,
+			}
+		}
+	}
+	if digestData && dsLen > 0 {
+		expected := digest.DataDigest(raw.DataSegment)
+		if expected != raw.DataDigest {
+			PutBuffer(payload)
+			return nil, &digest.DigestError{
+				Type:     digest.DigestData,
+				Expected: expected,
+				Actual:   raw.DataDigest,
+			}
 		}
 	}
 
