@@ -133,11 +133,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Documentation and Examples
 
-- [ ] **DOC-01**: Comprehensive API documentation with godoc
-- [ ] **DOC-02**: Example: basic discovery, login, read blocks, logout
-- [ ] **DOC-03**: Example: write blocks with verification
-- [ ] **DOC-04**: Example: raw CDB pass-through for custom SCSI commands
-- [ ] **DOC-05**: Example: error handling and recovery
+- [x] **DOC-01**: Comprehensive API documentation with godoc
+- [x] **DOC-02**: Example: basic discovery, login, read blocks, logout
+- [x] **DOC-03**: Example: write blocks with verification
+- [x] **DOC-04**: Example: raw CDB pass-through for custom SCSI commands
+- [x] **DOC-05**: Example: error handling and recovery
 
 ## v2 Requirements
 
@@ -262,11 +262,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-03 | Phase 1 | Complete |
 | TEST-04 | Phase 2 | Pending |
 | TEST-05 | Phase 6 | Complete |
-| DOC-01 | Phase 7 | Pending |
-| DOC-02 | Phase 7 | Pending |
-| DOC-03 | Phase 7 | Pending |
-| DOC-04 | Phase 7 | Pending |
-| DOC-05 | Phase 7 | Pending |
+| DOC-01 | Phase 7 | Complete |
+| DOC-02 | Phase 7 | Complete |
+| DOC-03 | Phase 7 | Complete |
+| DOC-04 | Phase 7 | Complete |
+| DOC-05 | Phase 7 | Complete |
 
 **Coverage:**
 - v1 requirements: 81 total
