@@ -127,6 +127,31 @@ func TestProbePortalError(t *testing.T) {
 	}
 }
 
+func TestProbeAllWithInitiatorName(t *testing.T) {
+	origDiscover := discoverFunc
+	t.Cleanup(func() { discoverFunc = origDiscover })
+
+	var receivedOpts []uiscsi.Option
+	discoverFunc = func(ctx context.Context, addr string, opts ...uiscsi.Option) ([]uiscsi.Target, error) {
+		receivedOpts = opts
+		return nil, fmt.Errorf("expected failure")
+	}
+
+	opts := []uiscsi.Option{uiscsi.WithInitiatorName("iqn.2025-01.com.example:test")}
+	results := probeAll(context.Background(), []string{"10.0.0.1:3260"}, opts)
+
+	if len(results) != 1 {
+		t.Fatalf("probeAll returned %d results, want 1", len(results))
+	}
+	if results[0].Err == nil {
+		t.Fatal("expected non-nil Err")
+	}
+	// Verify the option was passed through to discoverFunc.
+	if len(receivedOpts) != 1 {
+		t.Fatalf("discoverFunc received %d opts, want 1", len(receivedOpts))
+	}
+}
+
 // contains reports whether s contains substr (avoids strings import in test).
 func contains(s, substr string) bool {
 	for i := 0; i+len(substr) <= len(s); i++ {

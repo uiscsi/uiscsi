@@ -48,6 +48,32 @@ func TestPortalFlagRepeated(t *testing.T) {
 	}
 }
 
+func TestInitiatorNameFlag(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	initiatorName := fs.String("initiator-name", "", "initiator IQN")
+
+	err := fs.Parse([]string{"--initiator-name", "iqn.2025-01.com.example:initiator"})
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+	if *initiatorName != "iqn.2025-01.com.example:initiator" {
+		t.Errorf("initiator-name = %q, want %q", *initiatorName, "iqn.2025-01.com.example:initiator")
+	}
+}
+
+func TestInitiatorNameFlagDefault(t *testing.T) {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	initiatorName := fs.String("initiator-name", "", "initiator IQN")
+
+	err := fs.Parse([]string{})
+	if err != nil {
+		t.Fatalf("Parse error: %v", err)
+	}
+	if *initiatorName != "" {
+		t.Errorf("initiator-name = %q, want empty", *initiatorName)
+	}
+}
+
 func TestPortalFlagMissing(t *testing.T) {
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
 	var portals stringSlice
