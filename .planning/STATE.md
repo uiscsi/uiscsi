@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 07-03-PLAN.md
-last_updated: "2026-04-02T08:55:48.535Z"
+last_updated: "2026-04-02T09:05:29.045Z"
 last_activity: 2026-04-02
 progress:
   total_phases: 8
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 25
-  completed_plans: 24
+  completed_plans: 25
   percent: 92
 ---
 
@@ -25,8 +25,8 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 
 ## Current Position
 
-Phase: 07 (public-api-observability-and-release) — EXECUTING
-Plan: 3 of 3
+Phase: 07
+Plan: Not started
 Status: Ready to execute
 Last activity: 2026-04-02
 
@@ -124,13 +124,11 @@ Recent decisions affecting current work:
 - [Phase 06.1]: Login logger injected via WithLoginLogger option, defaults to slog.Default()
 - [Phase 07]: All public types are value types in root package -- no internal type leakage
 - [Phase 07]: WithPDUHook adapter concatenates BHS+DataSegment into []byte to avoid exposing transport.RawPDU
-<<<<<<< Updated upstream
+
 - [Phase 07]: Godoc examples have no Output markers since they connect to non-existent addresses
-=======
 - [Phase 07]: MockTarget uses opcode-keyed handler dispatch for composable test targets
 - [Phase 07]: Conformance tests use external test package (conformance_test) for public API-only validation
 - [Phase 07]: Integration tests behind //go:build integration tag per D-07 tiered approach
->>>>>>> Stashed changes
 
 ### Roadmap Evolution
 
