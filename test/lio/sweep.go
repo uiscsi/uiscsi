@@ -28,6 +28,13 @@ func SweepOrphans() error {
 			}
 		}
 	}
+
+	// Sweep orphaned backstores independently. A backstore may be orphaned
+	// if the IQN was already removed (or never created) but the backstore
+	// was left behind -- e.g., Setup failed between backstore creation and
+	// IQN creation on a previous run.
+	cleanOrphanBackstores()
+
 	return nil
 }
 
@@ -72,9 +79,9 @@ func teardownTarget(iqn string) error {
 		return fmt.Errorf("remove IQN %s: %w", iqn, err)
 	}
 
-	// Remove associated backstores. Scan fileio_0 for entries matching
-	// the IQN's random suffix pattern.
-	cleanOrphanBackstores(iqn)
+	// Remove associated backstores. Scans fileio_0 for all e2e- prefixed
+	// entries -- intentionally broad to catch any orphans.
+	cleanOrphanBackstores()
 
 	return nil
 }
@@ -97,8 +104,9 @@ func removeLUNDirs(parent string) {
 }
 
 // cleanOrphanBackstores removes any backstores under fileio_0 that have
-// the e2e- prefix. Also removes corresponding /dev/shm files.
-func cleanOrphanBackstores(iqn string) {
+// the e2e- prefix. Also removes corresponding /dev/shm files. Backstores
+// are disabled before removal to avoid kernel resistance on some versions.
+func cleanOrphanBackstores() {
 	hbaDir := filepath.Join(coreBase, backstoreHBA)
 	entries, err := os.ReadDir(hbaDir)
 	if err != nil {
@@ -109,6 +117,9 @@ func cleanOrphanBackstores(iqn string) {
 			continue
 		}
 		bsDir := filepath.Join(hbaDir, e.Name())
+		// Disable before removal -- some kernels resist removing an
+		// enabled backstore that had references.
+		_ = writeConfigfs(filepath.Join(bsDir, "enable"), "0")
 		_ = os.Remove(bsDir)
 
 		// Also remove /dev/shm backing file.

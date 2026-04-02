@@ -122,9 +122,24 @@ func runMockTarget(t *testing.T, ln net.Listener, cfg mockTargetConfig) {
 				continue
 			}
 
-			// CHAP authentication.
+			// CHAP authentication: 3-round-trip flow per RFC 7143.
 			if _, hasAuthMethod := keys["AuthMethod"]; hasAuthMethod {
-				// First CHAP request: send challenge.
+				// Round 1: Confirm AuthMethod=CHAP.
+				authRespKeys := []KeyValue{
+					{Key: "AuthMethod", Value: "CHAP"},
+				}
+				sendMockLoginResp(t, conn, req, authRespKeys, statSN, 0, 0, 0, false, stageSecurityNegotiation, stageSecurityNegotiation)
+				statSN++
+
+				// Round 2: Read CHAP_A, send challenge.
+				rawAlgo, err := transport.ReadRawPDU(conn, false, false)
+				if err != nil {
+					t.Logf("mock target: read CHAP_A: %v", err)
+					return
+				}
+				reqAlgo := &pdu.LoginReq{}
+				reqAlgo.UnmarshalBHS(rawAlgo.BHS)
+
 				var idBuf [1]byte
 				if _, err := rand.Read(idBuf[:]); err != nil {
 					t.Errorf("mock target: rand: %v", err)
@@ -141,13 +156,10 @@ func runMockTarget(t *testing.T, ln net.Listener, cfg mockTargetConfig) {
 					{Key: "CHAP_I", Value: strconv.Itoa(int(idBuf[0]))},
 					{Key: "CHAP_C", Value: encodeCHAPBinary(challenge)},
 				}
-
-				// Store challenge info for verification of next step.
-				// We store in the config for simplicity in the test helper.
-				sendMockLoginResp(t, conn, req, respKeys, statSN, 0, 0, 0, false, stageSecurityNegotiation, stageSecurityNegotiation)
+				sendMockLoginResp(t, conn, reqAlgo, respKeys, statSN, 0, 0, 0, false, stageSecurityNegotiation, stageSecurityNegotiation)
 				statSN++
 
-				// Read CHAP response from initiator.
+				// Round 3: Read CHAP response from initiator.
 				raw2, err := transport.ReadRawPDU(conn, false, false)
 				if err != nil {
 					t.Logf("mock target: read CHAP response: %v", err)

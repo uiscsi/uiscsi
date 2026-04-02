@@ -123,6 +123,7 @@ type setupState struct {
 	backstoreNames []string // one per LUN
 	shmPaths       []string // one per LUN
 	initiatorIQN   string
+	hasExplicitACL bool // true if explicit ACL was created (CHAP targets)
 	lunCount       int
 }
 
@@ -130,6 +131,11 @@ type setupState struct {
 // information and a cleanup function that tears down all resources in strict
 // reverse order. The cleanup function is NOT registered with t.Cleanup --
 // callers control teardown timing.
+//
+// If Setup fails partway through resource creation, it tears down all
+// partially-created resources before calling t.Fatalf. This prevents
+// orphaned configfs entries since the caller's defer cleanup() would never
+// run (t.Fatalf calls runtime.Goexit before Setup returns).
 //
 // Setup calls RequireRoot, RequireModules, and RequireConfigfs internally,
 // skipping the test if prerequisites are not met.
@@ -161,6 +167,16 @@ func Setup(t *testing.T, cfg Config) (*Target, func()) {
 		lunCount:     len(lunSizes),
 	}
 
+	// setupFatalf tears down partially-created resources before aborting.
+	// This is necessary because the caller's defer cleanup() has not been
+	// registered yet (Setup hasn't returned), so t.Fatalf alone would
+	// orphan any configfs resources created so far.
+	setupFatalf := func(format string, args ...any) {
+		t.Helper()
+		teardownState(state)
+		t.Fatalf(format, args...)
+	}
+
 	// Step 1: Create fileio backstores.
 	for i, size := range lunSizes {
 		bsName := fmt.Sprintf("e2e-%s-lun%d", suffix, i)
@@ -169,11 +185,11 @@ func Setup(t *testing.T, cfg Config) (*Target, func()) {
 		// Pre-create backing file.
 		f, err := os.Create(shmPath)
 		if err != nil {
-			t.Fatalf("create backing file %s: %v", shmPath, err)
+			setupFatalf("create backing file %s: %v", shmPath, err)
 		}
 		if err := f.Truncate(size); err != nil {
 			f.Close()
-			t.Fatalf("truncate backing file %s: %v", shmPath, err)
+			setupFatalf("truncate backing file %s: %v", shmPath, err)
 		}
 		f.Close()
 
@@ -183,110 +199,138 @@ func Setup(t *testing.T, cfg Config) (*Target, func()) {
 		// Create backstore in configfs.
 		bsDir := filepath.Join(coreBase, backstoreHBA, bsName)
 		if err := os.MkdirAll(bsDir, 0o755); err != nil {
-			t.Fatalf("mkdir backstore %s: %v", bsDir, err)
+			setupFatalf("mkdir backstore %s: %v", bsDir, err)
 		}
 
 		ctrl := fmt.Sprintf("fd_dev_name=%s,fd_dev_size=%d", shmPath, size)
 		if err := writeConfigfs(filepath.Join(bsDir, "control"), ctrl); err != nil {
-			t.Fatalf("write backstore control: %v", err)
+			setupFatalf("write backstore control: %v", err)
 		}
 		if err := writeConfigfs(filepath.Join(bsDir, "enable"), "1"); err != nil {
-			t.Fatalf("enable backstore: %v", err)
+			setupFatalf("enable backstore: %v", err)
 		}
 	}
 
 	// Step 2: Create iSCSI target IQN.
 	iqnDir := filepath.Join(iscsiBase, iqn)
 	if err := os.MkdirAll(iqnDir, 0o755); err != nil {
-		t.Fatalf("mkdir IQN %s: %v", iqnDir, err)
+		setupFatalf("mkdir IQN %s: %v", iqnDir, err)
 	}
 
 	// Step 3: Create TPG.
 	tpgDir := filepath.Join(iqnDir, "tpgt_1")
 	if err := os.MkdirAll(tpgDir, 0o755); err != nil {
-		t.Fatalf("mkdir TPG: %v", err)
+		setupFatalf("mkdir TPG: %v", err)
 	}
 
 	// Step 4: Create network portal.
 	npDir := filepath.Join(tpgDir, "np", addr)
 	if err := os.MkdirAll(npDir, 0o755); err != nil {
-		t.Fatalf("mkdir network portal %s: %v", npDir, err)
+		setupFatalf("mkdir network portal %s: %v", npDir, err)
 	}
 
 	// Step 5: Create LUNs and link to backstores.
 	for i, bsName := range state.backstoreNames {
 		lunDir := filepath.Join(tpgDir, "lun", fmt.Sprintf("lun_%d", i))
 		if err := os.MkdirAll(lunDir, 0o755); err != nil {
-			t.Fatalf("mkdir LUN %d: %v", i, err)
+			setupFatalf("mkdir LUN %d: %v", i, err)
 		}
 
 		bsTarget := filepath.Join(coreBase, backstoreHBA, bsName)
 		linkPath := filepath.Join(lunDir, "backstore")
 		if err := os.Symlink(bsTarget, linkPath); err != nil {
-			t.Fatalf("symlink LUN %d to backstore: %v", i, err)
+			setupFatalf("symlink LUN %d to backstore: %v", i, err)
 		}
 	}
 
-	// Step 6: Create ACL for initiator.
-	aclDir := filepath.Join(tpgDir, "acls", cfg.InitiatorIQN)
-	if err := os.MkdirAll(aclDir, 0o755); err != nil {
-		t.Fatalf("mkdir ACL %s: %v", aclDir, err)
-	}
-
-	// Step 7: Create mapped LUNs in ACL.
-	for i := range state.backstoreNames {
-		mappedDir := filepath.Join(aclDir, fmt.Sprintf("lun_%d", i))
-		if err := os.MkdirAll(mappedDir, 0o755); err != nil {
-			t.Fatalf("mkdir mapped LUN %d: %v", i, err)
-		}
-
-		tpgLunDir := filepath.Join(tpgDir, "lun", fmt.Sprintf("lun_%d", i))
-		linkPath := filepath.Join(mappedDir, "mapped_link")
-		if err := os.Symlink(tpgLunDir, linkPath); err != nil {
-			t.Fatalf("symlink mapped LUN %d: %v", i, err)
-		}
-	}
-
-	// Step 8: Configure CHAP if requested.
+	// Step 6–8: ACL and authentication setup.
+	//
+	// For CHAP targets: create explicit ACL with CHAP credentials and
+	// mapped LUNs (kernel auto-links by LUN number on mkdir — no manual
+	// symlink needed on modern kernels).
+	//
+	// For non-CHAP targets: skip explicit ACLs entirely. Set
+	// generate_node_acls=1 so the kernel auto-creates ACLs and maps
+	// all LUNs for any connecting initiator.
 	if cfg.CHAPUser != "" {
-		// Enforce CHAP authentication on the TPG.
-		if err := writeConfigfs(filepath.Join(tpgDir, "attrib", "authentication"), "1"); err != nil {
-			t.Fatalf("set authentication=1: %v", err)
+		state.hasExplicitACL = true
+
+		// Create ACL for the specific initiator.
+		aclDir := filepath.Join(tpgDir, "acls", cfg.InitiatorIQN)
+		if err := os.MkdirAll(aclDir, 0o755); err != nil {
+			setupFatalf("mkdir ACL %s: %v", aclDir, err)
 		}
 
+		// Create mapped LUNs in ACL. The kernel auto-links to the
+		// matching TPG LUN by number — no explicit symlink needed.
+		for i := range state.backstoreNames {
+			mappedDir := filepath.Join(aclDir, fmt.Sprintf("lun_%d", i))
+			if err := os.MkdirAll(mappedDir, 0o755); err != nil {
+				setupFatalf("mkdir mapped LUN %d: %v", i, err)
+			}
+		}
+
+		// Set CHAP credentials on the ACL.
 		authDir := filepath.Join(aclDir, "auth")
 		if err := writeConfigfs(filepath.Join(authDir, "userid"), cfg.CHAPUser); err != nil {
-			t.Fatalf("set CHAP userid: %v", err)
+			setupFatalf("set CHAP userid: %v", err)
 		}
 		if err := writeConfigfs(filepath.Join(authDir, "password"), cfg.CHAPPassword); err != nil {
-			t.Fatalf("set CHAP password: %v", err)
+			setupFatalf("set CHAP password: %v", err)
 		}
 
-		// Mutual CHAP.
+		// Mutual CHAP credentials.
 		if cfg.MutualUser != "" {
 			if err := writeConfigfs(filepath.Join(authDir, "userid_mutual"), cfg.MutualUser); err != nil {
-				t.Fatalf("set mutual CHAP userid: %v", err)
+				setupFatalf("set mutual CHAP userid: %v", err)
 			}
 			if err := writeConfigfs(filepath.Join(authDir, "password_mutual"), cfg.MutualPassword); err != nil {
-				t.Fatalf("set mutual CHAP password: %v", err)
+				setupFatalf("set mutual CHAP password: %v", err)
 			}
-			if err := writeConfigfs(filepath.Join(authDir, "authenticate_target"), "1"); err != nil {
-				t.Fatalf("set authenticate_target=1: %v", err)
-			}
+			// authenticate_target is read-only on some kernels (auto-set
+			// when userid_mutual/password_mutual are written). Best-effort.
+			_ = writeConfigfs(filepath.Join(authDir, "authenticate_target"), "1")
+		}
+
+		// Enforce CHAP authentication on the TPG — set AFTER credentials
+		// are in place so the kernel sees valid auth config.
+		if err := writeConfigfs(filepath.Join(tpgDir, "attrib", "authentication"), "1"); err != nil {
+			setupFatalf("set authentication=1: %v", err)
 		}
 	} else {
-		// No CHAP -- enable demo mode for any initiator.
+		state.hasExplicitACL = true
+
+		// No CHAP — create explicit ACL (for LUN mapping) and enable
+		// demo mode so no authentication is required.
+		aclDir := filepath.Join(tpgDir, "acls", cfg.InitiatorIQN)
+		if err := os.MkdirAll(aclDir, 0o755); err != nil {
+			setupFatalf("mkdir ACL %s: %v", aclDir, err)
+		}
+		for i := range state.backstoreNames {
+			mappedDir := filepath.Join(aclDir, fmt.Sprintf("lun_%d", i))
+			if err := os.MkdirAll(mappedDir, 0o755); err != nil {
+				setupFatalf("mkdir mapped LUN %d: %v", i, err)
+			}
+		}
+		// Kernel defaults: authentication=1, AuthMethod=CHAP.
+		// Explicitly disable CHAP enforcement and allow AuthMethod=None.
+		if err := writeConfigfs(filepath.Join(tpgDir, "attrib", "authentication"), "0"); err != nil {
+			setupFatalf("set authentication=0: %v", err)
+		}
+		if err := writeConfigfs(filepath.Join(tpgDir, "param", "AuthMethod"), "CHAP,None"); err != nil {
+			setupFatalf("set AuthMethod=CHAP,None: %v", err)
+		}
 		if err := writeConfigfs(filepath.Join(tpgDir, "attrib", "generate_node_acls"), "1"); err != nil {
-			t.Fatalf("set generate_node_acls=1: %v", err)
+			setupFatalf("set generate_node_acls=1: %v", err)
 		}
 		if err := writeConfigfs(filepath.Join(tpgDir, "attrib", "demo_mode_write_protect"), "0"); err != nil {
-			t.Fatalf("set demo_mode_write_protect=0: %v", err)
+			setupFatalf("set demo_mode_write_protect=0: %v", err)
 		}
 	}
 
 	// Step 9: Enable TPG.
 	if err := writeConfigfs(filepath.Join(tpgDir, "enable"), "1"); err != nil {
-		t.Fatalf("enable TPG: %v", err)
+		setupFatalf("enable TPG: %v", err)
 	}
 
 	tgt := &Target{
@@ -314,8 +358,8 @@ func teardownState(st *setupState) {
 		log.Printf("lio cleanup: disable TPG: %v", err)
 	}
 
-	// 2-3. Remove ACL mapped LUN symlinks and dirs, then ACL dirs.
-	if st.initiatorIQN != "" {
+	// 2-3. Remove ACL mapped LUN dirs, then ACL dirs (CHAP targets only).
+	if st.hasExplicitACL && st.initiatorIQN != "" {
 		aclDir := filepath.Join(tpgDir, "acls", st.initiatorIQN)
 		for i := range st.lunCount {
 			mappedDir := filepath.Join(aclDir, fmt.Sprintf("lun_%d", i))
@@ -354,9 +398,14 @@ func teardownState(st *setupState) {
 		log.Printf("lio cleanup: remove IQN: %v", err)
 	}
 
-	// 9. Remove backstores.
+	// 9. Disable and remove backstores.
 	for _, bsName := range st.backstoreNames {
 		bsDir := filepath.Join(coreBase, backstoreHBA, bsName)
+		// Disable before removal -- some kernels resist removing an
+		// enabled backstore that had references.
+		if err := writeConfigfs(filepath.Join(bsDir, "enable"), "0"); err != nil {
+			log.Printf("lio cleanup: disable backstore %s: %v", bsName, err)
+		}
 		if err := os.Remove(bsDir); err != nil {
 			log.Printf("lio cleanup: remove backstore %s: %v", bsName, err)
 		}

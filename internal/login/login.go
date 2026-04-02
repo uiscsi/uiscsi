@@ -264,13 +264,15 @@ func (ls *loginState) doSecurityNegotiation(ctx context.Context) error {
 		return nil
 	}
 
-	// CHAP authentication: multi-PDU exchange.
-	// Step 1: Send InitiatorName, TargetName, SessionType, AuthMethod=CHAP, CHAP_A=5.
+	// CHAP authentication: 3-round-trip exchange per RFC 7143 Section 12.1.3.
+	//
+	// Round 1: Propose AuthMethod=CHAP (no CHAP_A — sent separately in round 2).
+	// LIO and other targets require CHAP_A in a separate PDU after AuthMethod
+	// is confirmed; combining them causes immediate rejection.
 	keys := []KeyValue{
 		{Key: "InitiatorName", Value: ls.cfg.initiatorName},
 		{Key: "SessionType", Value: ls.cfg.sessionType},
 		{Key: "AuthMethod", Value: "CHAP"},
-		{Key: "CHAP_A", Value: "5"},
 	}
 	if ls.cfg.targetName != "" {
 		keys = append(keys, KeyValue{Key: "TargetName", Value: ls.cfg.targetName})
@@ -288,10 +290,27 @@ func (ls *loginState) doSecurityNegotiation(ctx context.Context) error {
 		}
 	}
 
+	// Round 2: Send CHAP_A=5 (MD5 algorithm selection).
+	// Target responds with CHAP_A, CHAP_I (identifier), CHAP_C (challenge).
+	algoKeys := []KeyValue{
+		{Key: "CHAP_A", Value: "5"},
+	}
+	resp, err = ls.sendLogin(ctx, algoKeys, false, stageSecurityNegotiation, stageSecurityNegotiation)
+	if err != nil {
+		return err
+	}
+	if resp.StatusClass != 0 {
+		return &LoginError{
+			StatusClass:  resp.StatusClass,
+			StatusDetail: resp.StatusDetail,
+			Message:      statusMessage(resp.StatusClass, resp.StatusDetail),
+		}
+	}
+
 	// Parse target's CHAP challenge from response.
 	respKeys := kvToMap(DecodeTextKV(resp.Data))
 
-	// Step 2: Process challenge and build response.
+	// Round 3: Process challenge and send CHAP response.
 	chapResp, err := ls.chap.processChallenge(respKeys)
 	if err != nil {
 		return fmt.Errorf("login: CHAP: %w", err)
