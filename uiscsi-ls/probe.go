@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"strings"
 	"time"
@@ -18,21 +17,6 @@ var discoverFunc = uiscsi.Discover
 // dialFunc is a package-level variable wrapping uiscsi.Dial so tests can
 // replace it with a stub.
 var dialFunc = uiscsi.Dial
-
-// normalizePortal ensures addr has an explicit port. If no port is present,
-// ":3260" (the iSCSI default) is appended. IPv6 addresses are handled via
-// net.SplitHostPort / net.JoinHostPort.
-func normalizePortal(addr string) string {
-	host, port, err := net.SplitHostPort(addr)
-	if err != nil {
-		// No port present (or other parse error) -- treat entire addr as host.
-		return net.JoinHostPort(addr, "3260")
-	}
-	if port == "" {
-		port = "3260"
-	}
-	return net.JoinHostPort(host, port)
-}
 
 // resolveCHAP returns CHAP credentials resolved from explicit flag values
 // first, falling back to ISCSI_CHAP_USER / ISCSI_CHAP_SECRET environment
@@ -105,8 +89,10 @@ func probeTarget(ctx context.Context, portal string, t uiscsi.Target, opts []uis
 }
 
 // probeLUN runs Inquiry and (conditionally) ReadCapacity for a single LUN.
+// The lun parameter is a raw SAM-encoded 8-byte value from REPORT LUNS.
+// We decode it for display but pass the raw value to SCSI commands.
 func probeLUN(ctx context.Context, sess *uiscsi.Session, lun uint64) LUNResult {
-	lr := LUNResult{LUN: lun}
+	lr := LUNResult{LUN: uiscsi.DecodeLUN(lun)}
 
 	inq, err := sess.Inquiry(ctx, lun)
 	if err != nil {
@@ -115,7 +101,7 @@ func probeLUN(ctx context.Context, sess *uiscsi.Session, lun uint64) LUNResult {
 	}
 
 	lr.DeviceType = inq.DeviceType
-	lr.DeviceTypeS = deviceTypeName(inq.DeviceType)
+	lr.DeviceTypeS = uiscsi.DeviceTypeName(inq.DeviceType)
 	lr.Vendor = strings.TrimSpace(inq.VendorID)
 	lr.Product = strings.TrimSpace(inq.ProductID)
 	lr.Revision = strings.TrimSpace(inq.Revision)

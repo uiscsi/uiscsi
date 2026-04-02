@@ -16,16 +16,29 @@ package uiscsi
 import (
 	"context"
 	"errors"
+	"net"
 
 	"github.com/rkujawa/uiscsi/internal/login"
 	"github.com/rkujawa/uiscsi/internal/session"
 	"github.com/rkujawa/uiscsi/internal/transport"
 )
 
+// normalizePortal ensures addr has an explicit port. If no port is present,
+// the iSCSI default port 3260 (RFC 7143 Section 4.1) is appended.
+func normalizePortal(addr string) string {
+	_, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		// No port present — append default.
+		return net.JoinHostPort(addr, "3260")
+	}
+	return addr
+}
+
 // Dial connects to an iSCSI target at addr, performs login negotiation, and
 // returns a Session ready for SCSI commands. The caller must call
 // Session.Close when done.
 func Dial(ctx context.Context, addr string, opts ...Option) (*Session, error) {
+	addr = normalizePortal(addr)
 	cfg := &dialConfig{}
 	for _, o := range opts {
 		o(cfg)
@@ -64,6 +77,7 @@ func Dial(ctx context.Context, addr string, opts ...Option) (*Session, error) {
 // It dials, performs a Discovery session login, issues SendTargets, logs out,
 // and returns the discovered targets.
 func Discover(ctx context.Context, addr string, opts ...Option) ([]Target, error) {
+	addr = normalizePortal(addr)
 	cfg := &dialConfig{}
 	for _, o := range opts {
 		o(cfg)

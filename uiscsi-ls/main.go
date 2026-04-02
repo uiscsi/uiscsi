@@ -41,12 +41,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Normalize portals (default port 3260).
-	for i, p := range portals {
-		portals[i] = normalizePortal(p)
-	}
-
 	// Resolve CHAP credentials: flags take precedence over env vars.
+	// Note: port normalization (default 3260) is handled by uiscsi.Dial/Discover.
 	user, secret := resolveCHAP(*chapUser, *chapSecret)
 	var opts []uiscsi.Option
 	if *initiatorName != "" {

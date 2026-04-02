@@ -9,6 +9,62 @@ import (
 	"github.com/rkujawa/uiscsi/internal/session"
 )
 
+// DecodeLUN extracts the flat LUN number from an 8-byte SAM LUN encoding
+// as returned by [Session.ReportLuns]. SAM-5 Section 4.6.1 defines the
+// encoding: the first two bytes carry the address method and LUN value.
+//
+// For peripheral device addressing (method 00b), the LUN is in the low
+// 8 bits of the first two bytes. For flat space addressing (method 01b),
+// the LUN is a 14-bit value. Other methods return the raw upper 16 bits.
+func DecodeLUN(raw uint64) uint64 {
+	method := (raw >> 62) & 0x03
+	switch method {
+	case 0x00: // Peripheral device addressing
+		return (raw >> 48) & 0xFF
+	case 0x01: // Flat space addressing
+		return (raw >> 48) & 0x3FFF
+	default:
+		return (raw >> 48) & 0xFFFF
+	}
+}
+
+// deviceTypeNames maps SCSI peripheral device type codes (SPC-4 Table 49)
+// to short human-readable names. Indexed by code (0x00-0x1F).
+var deviceTypeNames = [32]string{
+	0x00: "disk",
+	0x01: "tape",
+	0x02: "printer",
+	0x03: "processor",
+	0x04: "worm",
+	0x05: "cd/dvd",
+	0x06: "scanner",
+	0x07: "optical",
+	0x08: "media changer",
+	0x09: "communications",
+	0x0C: "storage",
+	0x0D: "enclosure",
+	0x0E: "disk",
+	0x0F: "osd",
+	0x11: "osd",
+	0x1E: "wlun",
+	0x1F: "unknown",
+}
+
+// DeviceTypeName returns the short human-readable name for a SCSI peripheral
+// device type code as found in [InquiryData.DeviceType]. The names follow the
+// SPC-4 Table 49 convention used by lsscsi. Unknown or unmapped codes return
+// "unknown".
+func DeviceTypeName(code uint8) string {
+	if int(code) >= len(deviceTypeNames) {
+		return "unknown"
+	}
+	name := deviceTypeNames[code]
+	if name == "" {
+		return "unknown"
+	}
+	return name
+}
+
 // Target represents a discovered iSCSI target.
 type Target struct {
 	Name    string

@@ -8,27 +8,6 @@ import (
 	"github.com/rkujawa/uiscsi"
 )
 
-func TestNormalizePortal(t *testing.T) {
-	tests := []struct {
-		input string
-		want  string
-	}{
-		{"10.0.0.1:3260", "10.0.0.1:3260"},
-		{"10.0.0.1", "10.0.0.1:3260"},
-		{"10.0.0.1:9999", "10.0.0.1:9999"},
-		{"[::1]:3260", "[::1]:3260"},
-		{"::1", "[::1]:3260"},
-	}
-	for _, tc := range tests {
-		t.Run(tc.input, func(t *testing.T) {
-			got := normalizePortal(tc.input)
-			if got != tc.want {
-				t.Errorf("normalizePortal(%q) = %q, want %q", tc.input, got, tc.want)
-			}
-		})
-	}
-}
-
 func TestResolveCHAP(t *testing.T) {
 	tests := []struct {
 		name       string

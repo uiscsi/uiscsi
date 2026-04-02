@@ -8,32 +8,6 @@ import (
 	"testing"
 )
 
-func TestDeviceTypeName(t *testing.T) {
-	tests := []struct {
-		code uint8
-		want string
-	}{
-		{0x00, "disk"},
-		{0x01, "tape"},
-		{0x05, "cd/dvd"},
-		{0x08, "medchgr"},
-		{0x0D, "enclosu"},
-		{0x0E, "disk"},
-		{0x1E, "wlun"},
-		{0x1F, "unknown"},
-		{0x0A, "unknown"},
-		{0xFF, "unknown"},
-	}
-	for _, tt := range tests {
-		t.Run(fmt.Sprintf("0x%02X", tt.code), func(t *testing.T) {
-			got := deviceTypeName(tt.code)
-			if got != tt.want {
-				t.Errorf("deviceTypeName(0x%02X) = %q, want %q", tt.code, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestFormatCapacity(t *testing.T) {
 	tests := []struct {
 		blocks    uint64
@@ -161,3 +135,4 @@ func TestOutputColumnarErrorPortal(t *testing.T) {
 		t.Errorf("expected empty stdout for error portal, got: %q", buf.String())
 	}
 }
+

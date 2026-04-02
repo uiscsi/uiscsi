@@ -1,1 +1,8 @@
 .claude/worktrees/
+
+# Compiled binaries
+discover-read
+error-handling
+raw-cdb
+write-verify
+uiscsi-ls/uiscsi-ls
