@@ -74,9 +74,9 @@ func ReadRawPDU(r io.Reader, digestHeader, digestData bool) (*RawPDU, error) {
 		off += ahsLen
 	}
 
-	// Header digest
+	// Header digest — stored as native u32 (little-endian on x86).
 	if digestHeader {
-		raw.HeaderDigest = binary.BigEndian.Uint32(payload[off : off+4])
+		raw.HeaderDigest = binary.LittleEndian.Uint32(payload[off : off+4])
 		raw.HasHDigest = true
 		off += 4
 	}
@@ -90,9 +90,9 @@ func ReadRawPDU(r io.Reader, digestHeader, digestData bool) (*RawPDU, error) {
 		// Skip padding
 		off += padLen
 
-		// Data digest
+		// Data digest — same byte order as header digest.
 		if digestData {
-			raw.DataDigest = binary.BigEndian.Uint32(payload[off : off+4])
+			raw.DataDigest = binary.LittleEndian.Uint32(payload[off : off+4])
 			raw.HasDDigest = true
 		}
 	}
@@ -164,9 +164,11 @@ func WriteRawPDU(w io.Writer, p *RawPDU) error {
 		off += len(p.AHS)
 	}
 
-	// Header digest
+	// Header digest — stored as native u32 on the wire (little-endian on
+	// x86) per Linux iSCSI target implementation. RFC 7143 Section 12.1
+	// is ambiguous but all major implementations use host byte order.
 	if p.HasHDigest {
-		binary.BigEndian.PutUint32(buf[off:off+4], p.HeaderDigest)
+		binary.LittleEndian.PutUint32(buf[off:off+4], p.HeaderDigest)
 		off += 4
 	}
 
@@ -181,9 +183,9 @@ func WriteRawPDU(w io.Writer, p *RawPDU) error {
 		}
 		off += int(padLen)
 
-		// Data digest
+		// Data digest — same byte order as header digest.
 		if p.HasDDigest {
-			binary.BigEndian.PutUint32(buf[off:off+4], p.DataDigest)
+			binary.LittleEndian.PutUint32(buf[off:off+4], p.DataDigest)
 			off += 4
 		}
 	}

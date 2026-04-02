@@ -5,6 +5,24 @@ import (
 	"fmt"
 )
 
+// EncodeSAMLUN encodes a simple LUN number into the 8-byte SAM-5 LUN format
+// used in iSCSI BHS LUN fields and REPORT LUNS responses. Uses single-level
+// addressing (address mode 00b) where the LUN number goes into bytes 0-1.
+func EncodeSAMLUN(lun uint64) [8]byte {
+	var encoded [8]byte
+	binary.BigEndian.PutUint16(encoded[0:2], uint16(lun))
+	return encoded
+}
+
+// DecodeSAMLUN decodes an 8-byte SAM-5 LUN encoding into a simple LUN number.
+// Assumes single-level addressing (address mode 00b).
+func DecodeSAMLUN(b []byte) uint64 {
+	if len(b) < 2 {
+		return 0
+	}
+	return uint64(binary.BigEndian.Uint16(b[0:2]))
+}
+
 // PDU is the interface implemented by all iSCSI PDU types.
 // Each concrete type represents a specific opcode and provides BHS
 // marshaling/unmarshaling plus access to the data segment.

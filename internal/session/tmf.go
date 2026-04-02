@@ -2,7 +2,6 @@ package session
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"time"
 
@@ -31,8 +30,8 @@ func (s *Session) sendTMF(ctx context.Context, fn uint8, refTaskTag uint32, lun 
 		ExpStatSN:         s.getExpStatSN(),
 	}
 
-	// Set LUN in header for LUN-scoped TMFs.
-	binary.BigEndian.PutUint64(tmfReq.Header.LUN[:], lun)
+	// Set LUN in header for LUN-scoped TMFs (SAM-5 encoding).
+	tmfReq.Header.LUN = pdu.EncodeSAMLUN(lun)
 
 	bhs, err := tmfReq.MarshalBHS()
 	if err != nil {
@@ -41,6 +40,7 @@ func (s *Session) sendTMF(ctx context.Context, fn uint8, refTaskTag uint32, lun 
 	}
 
 	raw := &transport.RawPDU{BHS: bhs}
+	s.stampDigests(raw)
 
 	// Send to write pump.
 	select {

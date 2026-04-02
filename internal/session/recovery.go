@@ -2,7 +2,7 @@ package session
 
 import (
 	"context"
-	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -84,7 +84,10 @@ func (s *Session) reconnect(cause error) {
 			continue
 		}
 
-		// Login with same ISID + old TSIH for session reinstatement (RFC 7143 Section 6.3.5).
+		// Login with same ISID. First try old TSIH for session
+		// reinstatement (RFC 7143 Section 6.3.5). If that fails with
+		// "session does not exist" (class=2 detail=10), retry with
+		// TSIH=0 for a fresh session on the same attempt.
 		loginOpts := make([]login.LoginOption, 0, len(s.cfg.loginOpts)+3)
 		loginOpts = append(loginOpts, login.WithISID(s.isid), login.WithTSIH(s.tsih))
 		loginOpts = append(loginOpts, login.WithLoginLogger(s.cfg.logger))
@@ -92,15 +95,50 @@ func (s *Session) reconnect(cause error) {
 
 		params, err := login.Login(ctx, tc, loginOpts...)
 		if err != nil {
+			// If session reinstatement fails, try fresh session (TSIH=0).
+			var le *login.LoginError
+			if errors.As(err, &le) && le.StatusClass == 2 {
+				cancel()
+				tc.Close()
+
+				// Re-dial for fresh session login.
+				ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
+				tc2, dialErr := transport.Dial(ctx2, s.targetAddr)
+				if dialErr != nil {
+					cancel2()
+					lastErr = dialErr
+					s.cfg.logger.Warn("session: reconnect re-dial failed",
+						"attempt", attempt+1, "error", dialErr)
+					continue
+				}
+
+				freshOpts := make([]login.LoginOption, 0, len(s.cfg.loginOpts)+2)
+				freshOpts = append(freshOpts, login.WithISID(s.isid))
+				freshOpts = append(freshOpts, login.WithLoginLogger(s.cfg.logger))
+				freshOpts = append(freshOpts, s.cfg.loginOpts...)
+
+				params, err = login.Login(ctx2, tc2, freshOpts...)
+				cancel2()
+				if err != nil {
+					tc2.Close()
+					lastErr = err
+					s.cfg.logger.Warn("session: reconnect fresh login failed",
+						"attempt", attempt+1, "error", err)
+					continue
+				}
+				tc = tc2
+			} else {
+				cancel()
+				tc.Close()
+				lastErr = err
+				s.cfg.logger.Warn("session: reconnect login failed",
+					"attempt", attempt+1, "error", err)
+				continue
+			}
+		} else {
 			cancel()
-			tc.Close()
-			lastErr = err
-			s.cfg.logger.Warn("session: reconnect login failed",
-				"attempt", attempt+1, "error", err)
-			continue
 		}
 
-		cancel()
 		newConn = tc
 		newParams = params
 		break
@@ -229,7 +267,7 @@ func (s *Session) retryTasks(ctx context.Context, tasks map[uint32]*task) {
 			CDB:                        cmd.CDB,
 			ImmediateData:              immediateData,
 		}
-		binary.BigEndian.PutUint64(scsiCmd.Header.LUN[:], cmd.LUN)
+		scsiCmd.Header.LUN = pdu.EncodeSAMLUN(cmd.LUN)
 
 		bhs, encErr := scsiCmd.MarshalBHS()
 		if encErr != nil {
@@ -246,6 +284,8 @@ func (s *Session) retryTasks(ctx context.Context, tasks map[uint32]*task) {
 		s.tasks[newITT] = tk
 		s.mu.Unlock()
 
+		s.stampDigests(raw)
+
 		// Send to write pump.
 		select {
 		case s.writeCh <- raw:
@@ -256,7 +296,7 @@ func (s *Session) retryTasks(ctx context.Context, tasks map[uint32]*task) {
 
 		// Send unsolicited Data-Out if InitialR2T=No for writes.
 		if tk.isWrite && !s.params.InitialR2T && tk.reader != nil {
-			if err := tk.sendUnsolicitedDataOut(s.writeCh, s.getExpStatSN, s.params); err != nil {
+			if err := tk.sendUnsolicitedDataOut(s.writeCh, s.getExpStatSN, s.params, s.stampDigests); err != nil {
 				tk.cancel(fmt.Errorf("session: retry unsolicited data: %w", err))
 				continue
 			}

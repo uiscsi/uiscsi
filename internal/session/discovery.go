@@ -55,6 +55,7 @@ func (s *Session) SendTargets(ctx context.Context) ([]DiscoveryTarget, error) {
 	if len(data) > 0 {
 		raw.DataSegment = data
 	}
+	s.stampDigests(raw)
 
 	// Send to write pump.
 	select {

@@ -34,7 +34,7 @@ func writeRawBytes(w io.Writer, bhs [pdu.BHSLength]byte, ahs []byte, data []byte
 	}
 	if hdigest {
 		var hd [4]byte
-		binary.BigEndian.PutUint32(hd[:], 0xDEADBEEF) // dummy digest
+		binary.LittleEndian.PutUint32(hd[:], 0xDEADBEEF) // dummy digest
 		w.Write(hd[:])
 	}
 	if len(data) > 0 {
@@ -46,7 +46,7 @@ func writeRawBytes(w io.Writer, bhs [pdu.BHSLength]byte, ahs []byte, data []byte
 	}
 	if ddigest && len(data) > 0 {
 		var dd [4]byte
-		binary.BigEndian.PutUint32(dd[:], 0xCAFEBABE) // dummy digest
+		binary.LittleEndian.PutUint32(dd[:], 0xCAFEBABE) // dummy digest
 		w.Write(dd[:])
 	}
 }
@@ -323,7 +323,7 @@ func writeRawBytesWithDigests(w io.Writer, bhs [pdu.BHSLength]byte, ahs []byte, 
 			input = append(bhs[:], ahs...)
 		}
 		var hd [4]byte
-		binary.BigEndian.PutUint32(hd[:], digest.HeaderDigest(input))
+		binary.LittleEndian.PutUint32(hd[:], digest.HeaderDigest(input))
 		w.Write(hd[:])
 	}
 	if len(data) > 0 {
@@ -335,7 +335,7 @@ func writeRawBytesWithDigests(w io.Writer, bhs [pdu.BHSLength]byte, ahs []byte, 
 	}
 	if ddigest && len(data) > 0 {
 		var dd [4]byte
-		binary.BigEndian.PutUint32(dd[:], digest.DataDigest(data))
+		binary.LittleEndian.PutUint32(dd[:], digest.DataDigest(data))
 		w.Write(dd[:])
 	}
 }
@@ -351,7 +351,7 @@ func TestFramerReadRawPDU_HeaderDigestMismatch(t *testing.T) {
 		// Write BHS then a wrong header digest
 		wConn.Write(bhs[:])
 		var hd [4]byte
-		binary.BigEndian.PutUint32(hd[:], 0xBAD0BAD0) // wrong digest
+		binary.LittleEndian.PutUint32(hd[:], 0xBAD0BAD0) // wrong digest
 		wConn.Write(hd[:])
 	}()
 
@@ -392,7 +392,7 @@ func TestFramerReadRawPDU_DataDigestMismatch(t *testing.T) {
 			wConn.Write(make([]byte, padLen))
 		}
 		var dd [4]byte
-		binary.BigEndian.PutUint32(dd[:], 0xDEAD0000) // wrong digest
+		binary.LittleEndian.PutUint32(dd[:], 0xDEAD0000) // wrong digest
 		wConn.Write(dd[:])
 	}()
 
@@ -468,7 +468,7 @@ func TestFramerReadRawPDU_HeaderDigestMismatchWithAHS(t *testing.T) {
 		wConn.Write(bhs[:])
 		wConn.Write(ahs)
 		var hd [4]byte
-		binary.BigEndian.PutUint32(hd[:], 0xBAD0BAD0) // wrong digest
+		binary.LittleEndian.PutUint32(hd[:], 0xBAD0BAD0) // wrong digest
 		wConn.Write(hd[:])
 	}()
 

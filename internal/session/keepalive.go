@@ -69,6 +69,7 @@ func (s *Session) sendKeepalivePing(ctx context.Context) error {
 	}
 
 	raw := &transport.RawPDU{BHS: bhs}
+	s.stampDigests(raw)
 	select {
 	case s.writeCh <- raw:
 	case <-ctx.Done():
@@ -143,6 +144,7 @@ func (s *Session) handleUnsolicitedNOPIn(raw *transport.RawPDU) {
 		if len(nopOut.Data) > 0 {
 			resp.DataSegment = nopOut.Data
 		}
+		s.stampDigests(resp)
 
 		select {
 		case s.writeCh <- resp:

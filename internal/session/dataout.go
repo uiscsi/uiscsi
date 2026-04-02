@@ -15,7 +15,7 @@ import (
 // each burst per RFC 7143 Section 11.7.
 func (t *task) sendDataOutBurst(writeCh chan<- *transport.RawPDU,
 	ttt uint32, offset uint32, burstLen uint32, maxRecvDSL uint32,
-	expStatSN func() uint32) (uint32, error) {
+	expStatSN func() uint32, stampDigests func(*transport.RawPDU)) (uint32, error) {
 
 	var dataSN uint32 // per-burst DataSN starts at 0 (Pitfall 2)
 	var sent uint32
@@ -64,6 +64,9 @@ func (t *task) sendDataOutBurst(writeCh chan<- *transport.RawPDU,
 			BHS:         bhs,
 			DataSegment: buf[:n],
 		}
+		if stampDigests != nil {
+			stampDigests(raw)
+		}
 
 		writeCh <- raw
 
@@ -81,13 +84,14 @@ func (t *task) sendDataOutBurst(writeCh chan<- *transport.RawPDU,
 // handleR2T processes an R2T PDU by reading data from the task's io.Reader
 // and sending Data-Out PDUs. Enforces MaxBurstLength per WRITE-05.
 func (t *task) handleR2T(r2t *pdu.R2T, writeCh chan<- *transport.RawPDU,
-	expStatSN func() uint32, params login.NegotiatedParams) error {
+	expStatSN func() uint32, params login.NegotiatedParams,
+	stampDigests func(*transport.RawPDU)) error {
 
 	// Cap at MaxBurstLength per WRITE-05.
 	desired := min(r2t.DesiredDataTransferLength, params.MaxBurstLength)
 
 	_, err := t.sendDataOutBurst(writeCh, r2t.TargetTransferTag,
-		r2t.BufferOffset, desired, params.MaxRecvDataSegmentLength, expStatSN)
+		r2t.BufferOffset, desired, params.MaxRecvDataSegmentLength, expStatSN, stampDigests)
 	return err
 }
 
@@ -95,7 +99,8 @@ func (t *task) handleR2T(r2t *pdu.R2T, writeCh chan<- *transport.RawPDU,
 // when InitialR2T=No. The burst is bounded by FirstBurstLength minus any
 // immediate data already sent (tracked in t.bytesSent).
 func (t *task) sendUnsolicitedDataOut(writeCh chan<- *transport.RawPDU,
-	expStatSN func() uint32, params login.NegotiatedParams) error {
+	expStatSN func() uint32, params login.NegotiatedParams,
+	stampDigests func(*transport.RawPDU)) error {
 
 	remaining := params.FirstBurstLength - t.bytesSent
 	if remaining <= 0 {
@@ -106,7 +111,7 @@ func (t *task) sendUnsolicitedDataOut(writeCh chan<- *transport.RawPDU,
 	offset := t.bytesSent
 
 	sent, err := t.sendDataOutBurst(writeCh, unsolicitedTTT, offset,
-		remaining, params.MaxRecvDataSegmentLength, expStatSN)
+		remaining, params.MaxRecvDataSegmentLength, expStatSN, stampDigests)
 	t.bytesSent += sent
 	return err
 }

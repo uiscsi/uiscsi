@@ -2,7 +2,6 @@ package session
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"net"
 	"testing"
@@ -196,7 +195,7 @@ func TestAbortTaskSet(t *testing.T) {
 		t.Fatalf("Function: got %d, want %d", tmfReq.Function, TMFAbortTaskSet)
 	}
 	// Verify LUN is encoded in the TMF header.
-	gotLUN := binary.BigEndian.Uint64(tmfReq.Header.LUN[:])
+	gotLUN := pdu.DecodeSAMLUN(tmfReq.Header.LUN[:])
 	if gotLUN != lun {
 		t.Fatalf("LUN: got %d, want %d", gotLUN, lun)
 	}
@@ -254,7 +253,7 @@ func TestLUNReset(t *testing.T) {
 	if tmfReq.Function != TMFLogicalUnitReset {
 		t.Fatalf("Function: got %d, want %d", tmfReq.Function, TMFLogicalUnitReset)
 	}
-	gotLUN := binary.BigEndian.Uint64(tmfReq.Header.LUN[:])
+	gotLUN := pdu.DecodeSAMLUN(tmfReq.Header.LUN[:])
 	if gotLUN != lun {
 		t.Fatalf("LUN: got %d, want %d", gotLUN, lun)
 	}
@@ -376,7 +375,7 @@ func TestClearTaskSet(t *testing.T) {
 	if tmfReq.Function != TMFClearTaskSet {
 		t.Fatalf("Function: got %d, want %d", tmfReq.Function, TMFClearTaskSet)
 	}
-	gotLUN := binary.BigEndian.Uint64(tmfReq.Header.LUN[:])
+	gotLUN := pdu.DecodeSAMLUN(tmfReq.Header.LUN[:])
 	if gotLUN != lun {
 		t.Fatalf("LUN: got %d, want %d", gotLUN, lun)
 	}

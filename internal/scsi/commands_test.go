@@ -101,7 +101,7 @@ func TestParseReportLuns(t *testing.T) {
 					return b
 				}()),
 			},
-			want: []uint64{0, 0x0001000000000000},
+			want: []uint64{0, 1},
 		},
 		{
 			name: "empty list",

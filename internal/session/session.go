@@ -2,7 +2,6 @@ package session
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -181,7 +180,7 @@ func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error
 	}
 
 	// Set LUN in header.
-	binary.BigEndian.PutUint64(scsiCmd.Header.LUN[:], cmd.LUN)
+	scsiCmd.Header.LUN = pdu.EncodeSAMLUN(cmd.LUN)
 
 	// Encode to wire format.
 	bhs, encErr := scsiCmd.MarshalBHS()
@@ -197,6 +196,9 @@ func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error
 	if len(immediateData) > 0 {
 		raw.DataSegment = immediateData
 	}
+
+	// Compute digests before sending.
+	s.stampDigests(raw)
 
 	// Send to write pump.
 	select {
@@ -216,7 +218,7 @@ func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error
 	// This runs synchronously in Submit so the io.Reader is not yet shared
 	// with the task goroutine (Pitfall 6: no concurrent reads).
 	if isWrite && !s.params.InitialR2T {
-		if err := tk.sendUnsolicitedDataOut(s.writeCh, s.getExpStatSN, s.params); err != nil {
+		if err := tk.sendUnsolicitedDataOut(s.writeCh, s.getExpStatSN, s.params, s.stampDigests); err != nil {
 			s.router.Unregister(itt)
 			s.mu.Lock()
 			delete(s.tasks, itt)
@@ -295,6 +297,30 @@ func (s *Session) getExpStatSN() uint32 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.expStatSN
+}
+
+// stampDigests computes and attaches header and/or data digests to an
+// outgoing RawPDU based on the current connection's negotiated digest flags.
+// This must be called before sending any PDU to writeCh during full-feature
+// phase. Per RFC 7143 Section 12.1, digests cover BHS+AHS (header) and
+// data segment + padding (data).
+func (s *Session) stampDigests(raw *transport.RawPDU) {
+	if s.conn.DigestHeader() {
+		var input []byte
+		if len(raw.AHS) > 0 {
+			input = make([]byte, pdu.BHSLength+len(raw.AHS))
+			copy(input, raw.BHS[:])
+			copy(input[pdu.BHSLength:], raw.AHS)
+		} else {
+			input = raw.BHS[:]
+		}
+		raw.HeaderDigest = digest.HeaderDigest(input)
+		raw.HasHDigest = true
+	}
+	if s.conn.DigestData() && len(raw.DataSegment) > 0 {
+		raw.DataDigest = digest.DataDigest(raw.DataSegment)
+		raw.HasDDigest = true
+	}
 }
 
 // startPumps starts the background goroutines for the session. It captures
@@ -473,7 +499,7 @@ func (s *Session) taskLoop(tk *task, pduCh <-chan *transport.RawPDU) {
 					"max_cmd_sn", p.MaxCmdSN)
 			}
 			s.updateStatSN(p.StatSN)
-			if err := tk.handleR2T(p, s.writeCh, s.getExpStatSN, s.params); err != nil {
+			if err := tk.handleR2T(p, s.writeCh, s.getExpStatSN, s.params, s.stampDigests); err != nil {
 				tk.cancel(fmt.Errorf("session: write data (itt=0x%08x): %w", tk.itt, err))
 				s.cleanupTask(tk.itt)
 				return

@@ -33,7 +33,8 @@ func TestErrorRecovery_ConnectionDrop(t *testing.T) {
 	sess, err := uiscsi.Dial(ctx, tgt.Addr,
 		uiscsi.WithTarget(tgt.IQN),
 		uiscsi.WithInitiatorName(initiatorIQN),
-		uiscsi.WithMaxReconnectAttempts(3),
+		uiscsi.WithMaxReconnectAttempts(5),
+		uiscsi.WithReconnectBackoff(3*time.Second),
 	)
 	if err != nil {
 		t.Fatalf("Dial: %v", err)

@@ -79,7 +79,7 @@ func teardownTarget(iqn string) error {
 		return fmt.Errorf("remove IQN %s: %w", iqn, err)
 	}
 
-	// Remove associated backstores. Scans fileio_0 for all e2e- prefixed
+	// Remove associated backstores. Scans rd_mcp_0 for all e2e- prefixed
 	// entries -- intentionally broad to catch any orphans.
 	cleanOrphanBackstores()
 
@@ -103,9 +103,9 @@ func removeLUNDirs(parent string) {
 	}
 }
 
-// cleanOrphanBackstores removes any backstores under fileio_0 that have
-// the e2e- prefix. Also removes corresponding /dev/shm files. Backstores
-// are disabled before removal to avoid kernel resistance on some versions.
+// cleanOrphanBackstores removes any backstores under iblock_0 that have
+// the e2e- prefix. Also detaches orphaned loop devices and removes
+// backing files.
 func cleanOrphanBackstores() {
 	hbaDir := filepath.Join(coreBase, backstoreHBA)
 	entries, err := os.ReadDir(hbaDir)
@@ -121,9 +121,27 @@ func cleanOrphanBackstores() {
 		// enabled backstore that had references.
 		_ = writeConfigfs(filepath.Join(bsDir, "enable"), "0")
 		_ = os.Remove(bsDir)
+	}
 
-		// Also remove /dev/shm backing file.
-		shmPath := filepath.Join(shmDir, e.Name()+".img")
+	// Clean orphaned backing files and loop devices.
+	shmEntries, err := os.ReadDir(shmDir)
+	if err != nil {
+		return
+	}
+	for _, e := range shmEntries {
+		if !strings.HasPrefix(e.Name(), "e2e-") || !strings.HasSuffix(e.Name(), ".img") {
+			continue
+		}
+		shmPath := filepath.Join(shmDir, e.Name())
+		// Find and detach any loop device using this file.
+		out, _ := execCommand("losetup", "-j", shmPath)
+		for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+			if line == "" {
+				continue
+			}
+			loopDev := strings.SplitN(line, ":", 2)[0]
+			_, _ = execCommand("losetup", "-d", loopDev)
+		}
 		_ = os.Remove(shmPath)
 	}
 }

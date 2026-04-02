@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/rkujawa/uiscsi/internal/pdu"
 	"github.com/rkujawa/uiscsi/internal/session"
 )
 
@@ -43,7 +44,10 @@ func ReportLuns(allocLen uint32) session.Command {
 	return cmd
 }
 
-// ParseReportLuns parses a REPORT LUNS response into a slice of LUN values.
+// ParseReportLuns parses a REPORT LUNS response into a slice of decoded LUN
+// numbers. Each 8-byte LUN field uses SAM-5 LUN encoding; this function
+// decodes the simple single-level addressing (address mode 00b) where the
+// LUN number is in bytes 0-1 of each 8-byte entry.
 func ParseReportLuns(result session.Result) ([]uint64, error) {
 	data, err := checkResult(result)
 	if err != nil {
@@ -62,7 +66,7 @@ func ParseReportLuns(result session.Result) ([]uint64, error) {
 		if offset+8 > uint32(len(data)) {
 			break
 		}
-		luns = append(luns, binary.BigEndian.Uint64(data[offset:offset+8]))
+		luns = append(luns, pdu.DecodeSAMLUN(data[offset:offset+8]))
 	}
 
 	return luns, nil

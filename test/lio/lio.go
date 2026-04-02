@@ -14,6 +14,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -24,7 +25,7 @@ const (
 	coreBase       = "/sys/kernel/config/target/core"
 	IQNPrefix      = "iqn.2026-04.com.uiscsi.e2e:"
 	shmDir         = "/dev/shm"
-	backstoreHBA   = "fileio_0"
+	backstoreHBA   = "iblock_0"
 	defaultLUNSize = 64 * 1024 * 1024 // 64MB
 )
 
@@ -67,7 +68,7 @@ func RequireRoot(t *testing.T) {
 // RequireModules skips the test if required kernel modules are not loaded.
 func RequireModules(t *testing.T) {
 	t.Helper()
-	modules := []string{"target_core_mod", "iscsi_target_mod", "target_core_file"}
+	modules := []string{"target_core_mod", "iscsi_target_mod", "target_core_iblock"}
 	data, err := os.ReadFile("/proc/modules")
 	if err != nil {
 		t.Skipf("cannot read /proc/modules: %v", err)
@@ -115,13 +116,21 @@ func writeConfigfs(path, value string) error {
 	return os.WriteFile(path, []byte(value), 0o644)
 }
 
+// execCommand runs a command and returns its combined stdout+stderr output.
+func execCommand(name string, args ...string) (string, error) {
+	cmd := exec.Command(name, args...)
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
 // setupState tracks all resources created during Setup for reverse-order teardown.
 type setupState struct {
 	// Resources in creation order (teardown reverses this).
 	iqn            string
 	port           int
 	backstoreNames []string // one per LUN
-	shmPaths       []string // one per LUN
+	loopDevices    []string // loop device paths (e.g., /dev/loop0)
+	shmPaths       []string // backing file paths
 	initiatorIQN   string
 	hasExplicitACL bool // true if explicit ACL was created (CHAP targets)
 	lunCount       int
@@ -177,12 +186,15 @@ func Setup(t *testing.T, cfg Config) (*Target, func()) {
 		t.Fatalf(format, args...)
 	}
 
-	// Step 1: Create fileio backstores.
+	// Step 1: Create iblock backstores via loop devices. The fileio backend
+	// has a kernel bug on some versions (e.g., 6.19) where ReadCapacity
+	// returns wrong capacity regardless of fd_dev_size. Using iblock +
+	// loop devices avoids this — blockdev capacity is always correct.
 	for i, size := range lunSizes {
 		bsName := fmt.Sprintf("e2e-%s-lun%d", suffix, i)
 		shmPath := filepath.Join(shmDir, bsName+".img")
 
-		// Pre-create backing file.
+		// Create backing file (must be non-sparse for correct block count).
 		f, err := os.Create(shmPath)
 		if err != nil {
 			setupFatalf("create backing file %s: %v", shmPath, err)
@@ -193,16 +205,24 @@ func Setup(t *testing.T, cfg Config) (*Target, func()) {
 		}
 		f.Close()
 
+		// Create loop device.
+		out, err := execCommand("losetup", "-f", "--show", shmPath)
+		if err != nil {
+			setupFatalf("losetup for %s: %v (output: %s)", shmPath, err, out)
+		}
+		loopDev := strings.TrimSpace(out)
+
 		state.backstoreNames = append(state.backstoreNames, bsName)
+		state.loopDevices = append(state.loopDevices, loopDev)
 		state.shmPaths = append(state.shmPaths, shmPath)
 
-		// Create backstore in configfs.
+		// Create iblock backstore in configfs.
 		bsDir := filepath.Join(coreBase, backstoreHBA, bsName)
 		if err := os.MkdirAll(bsDir, 0o755); err != nil {
 			setupFatalf("mkdir backstore %s: %v", bsDir, err)
 		}
 
-		ctrl := fmt.Sprintf("fd_dev_name=%s,fd_dev_size=%d", shmPath, size)
+		ctrl := fmt.Sprintf("udev_path=%s", loopDev)
 		if err := writeConfigfs(filepath.Join(bsDir, "control"), ctrl); err != nil {
 			setupFatalf("write backstore control: %v", err)
 		}
@@ -298,22 +318,7 @@ func Setup(t *testing.T, cfg Config) (*Target, func()) {
 			setupFatalf("set authentication=1: %v", err)
 		}
 	} else {
-		state.hasExplicitACL = true
-
-		// No CHAP — create explicit ACL (for LUN mapping) and enable
-		// demo mode so no authentication is required.
-		aclDir := filepath.Join(tpgDir, "acls", cfg.InitiatorIQN)
-		if err := os.MkdirAll(aclDir, 0o755); err != nil {
-			setupFatalf("mkdir ACL %s: %v", aclDir, err)
-		}
-		for i := range state.backstoreNames {
-			mappedDir := filepath.Join(aclDir, fmt.Sprintf("lun_%d", i))
-			if err := os.MkdirAll(mappedDir, 0o755); err != nil {
-				setupFatalf("mkdir mapped LUN %d: %v", i, err)
-			}
-		}
-		// Kernel defaults: authentication=1, AuthMethod=CHAP.
-		// Explicitly disable CHAP enforcement and allow AuthMethod=None.
+		// No CHAP — use demo mode with auto-generated ACLs.
 		if err := writeConfigfs(filepath.Join(tpgDir, "attrib", "authentication"), "0"); err != nil {
 			setupFatalf("set authentication=0: %v", err)
 		}
@@ -358,18 +363,27 @@ func teardownState(st *setupState) {
 		log.Printf("lio cleanup: disable TPG: %v", err)
 	}
 
-	// 2-3. Remove ACL mapped LUN dirs, then ACL dirs (CHAP targets only).
-	if st.hasExplicitACL && st.initiatorIQN != "" {
-		aclDir := filepath.Join(tpgDir, "acls", st.initiatorIQN)
-		for i := range st.lunCount {
-			mappedDir := filepath.Join(aclDir, fmt.Sprintf("lun_%d", i))
-			removeSymlinksIn(mappedDir)
-			if err := os.Remove(mappedDir); err != nil {
-				log.Printf("lio cleanup: remove mapped LUN %d: %v", i, err)
+	// 2-3. Remove all ACLs (both explicit and auto-generated).
+	aclsDir := filepath.Join(tpgDir, "acls")
+	if acls, err := os.ReadDir(aclsDir); err == nil {
+		for _, acl := range acls {
+			aclDir := filepath.Join(aclsDir, acl.Name())
+			// Remove mapped LUNs inside ACL.
+			if luns, err := os.ReadDir(aclDir); err == nil {
+				for _, l := range luns {
+					if !strings.HasPrefix(l.Name(), "lun_") {
+						continue
+					}
+					mappedDir := filepath.Join(aclDir, l.Name())
+					removeSymlinksIn(mappedDir)
+					if err := os.Remove(mappedDir); err != nil {
+						log.Printf("lio cleanup: remove mapped LUN %s: %v", l.Name(), err)
+					}
+				}
 			}
-		}
-		if err := os.Remove(aclDir); err != nil {
-			log.Printf("lio cleanup: remove ACL: %v", err)
+			if err := os.Remove(aclDir); err != nil {
+				log.Printf("lio cleanup: remove ACL %s: %v", acl.Name(), err)
+			}
 		}
 	}
 
@@ -411,7 +425,14 @@ func teardownState(st *setupState) {
 		}
 	}
 
-	// 10. Remove /dev/shm backing files.
+	// 10. Detach loop devices.
+	for _, loopDev := range st.loopDevices {
+		if _, err := execCommand("losetup", "-d", loopDev); err != nil {
+			log.Printf("lio cleanup: detach loop device %s: %v", loopDev, err)
+		}
+	}
+
+	// 11. Remove /dev/shm backing files.
 	for _, shmPath := range st.shmPaths {
 		if err := os.Remove(shmPath); err != nil {
 			log.Printf("lio cleanup: remove backing file %s: %v", shmPath, err)

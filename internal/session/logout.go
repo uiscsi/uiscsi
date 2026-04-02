@@ -39,6 +39,7 @@ func (s *Session) logout(ctx context.Context, reasonCode uint8) error {
 	}
 
 	raw := &transport.RawPDU{BHS: bhs}
+	s.stampDigests(raw)
 	select {
 	case s.writeCh <- raw:
 	case <-ctx.Done():
