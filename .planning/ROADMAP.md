@@ -184,7 +184,7 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 09-01-PLAN.md — LIO configfs helper package, orphan sweep, basic connectivity E2E test, delete gotgt stubs
+- [x] 09-01-PLAN.md — LIO configfs helper package, orphan sweep, basic connectivity E2E test, delete gotgt stubs
 - [ ] 09-02-PLAN.md — Data integrity, CHAP, digest, multi-LUN, TMF, and error recovery E2E tests
 
 ## Progress
