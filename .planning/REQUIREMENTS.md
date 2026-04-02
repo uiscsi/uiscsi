@@ -125,8 +125,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Testing
 
-- [ ] **TEST-01**: IOL-inspired conformance test suite covering full feature phase
-- [ ] **TEST-02**: Integration test infrastructure with automated target setup (no manual SAN configuration)
+- [x] **TEST-01**: IOL-inspired conformance test suite covering full feature phase
+- [x] **TEST-02**: Integration test infrastructure with automated target setup (no manual SAN configuration)
 - [x] **TEST-03**: Table-driven unit tests for PDU encoding/decoding
 - [ ] **TEST-04**: Parameterized tests for negotiation parameter matrix
 - [x] **TEST-05**: Error injection tests for recovery level verification
@@ -257,8 +257,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | OBS-01 | Phase 7 | Complete |
 | OBS-02 | Phase 7 | Complete |
 | OBS-03 | Phase 7 | Complete |
-| TEST-01 | Phase 7 | Pending |
-| TEST-02 | Phase 7 | Pending |
+| TEST-01 | Phase 7 | Complete |
+| TEST-02 | Phase 7 | Complete |
 | TEST-03 | Phase 1 | Complete |
 | TEST-04 | Phase 2 | Pending |
 | TEST-05 | Phase 6 | Complete |

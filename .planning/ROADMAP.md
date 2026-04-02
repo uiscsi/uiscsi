@@ -152,7 +152,7 @@ Plans:
 Plans:
 - [x] 07-01-PLAN.md — Public API surface: types, errors, options, Dial/Discover, Session methods, streaming I/O
 - [ ] 07-02-PLAN.md — Mock target infrastructure and IOL-inspired conformance test suite
-- [ ] 07-03-PLAN.md — Documentation: godoc examples, example programs, README
+- [x] 07-03-PLAN.md — Documentation: godoc examples, example programs, README
 
 ## Progress
 
