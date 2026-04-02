@@ -150,7 +150,7 @@ Plans:
   5. IOL-inspired conformance test suite runs against automated test infrastructure with no manual SAN setup, and godoc plus four worked examples cover discovery, read, write, raw CDB, and error handling
 **Plans:** 3 plans
 Plans:
-- [ ] 07-01-PLAN.md — Public API surface: types, errors, options, Dial/Discover, Session methods, streaming I/O
+- [x] 07-01-PLAN.md — Public API surface: types, errors, options, Dial/Discover, Session methods, streaming I/O
 - [ ] 07-02-PLAN.md — Mock target infrastructure and IOL-inspired conformance test suite
 - [ ] 07-03-PLAN.md — Documentation: godoc examples, example programs, README
 

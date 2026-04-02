@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 7 context gathered
-last_updated: "2026-04-01T21:32:45.020Z"
-last_activity: 2026-04-01
+stopped_at: Completed 07-01-PLAN.md
+last_updated: "2026-04-02T08:45:18.685Z"
+last_activity: 2026-04-02 -- Completed 07-01 public API surface
 progress:
   total_phases: 8
   completed_phases: 7
-  total_plans: 22
-  completed_plans: 22
-  percent: 66
+  total_plans: 25
+  completed_plans: 23
+  percent: 92
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-31)
 
 **Core value:** Full RFC 7143 compliance as a composable Go library
-**Current focus:** Phase 04 — write-path
+**Current focus:** Phase 07 — public-api-observability-and-release
 
 ## Current Position
 
-Phase: 7
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-04-01
+Phase: 07 (public-api-observability-and-release) — EXECUTING
+Plan: 2 of 3
+Status: Executing Phase 07
+Last activity: 2026-04-02 -- Completed 07-01 public API surface
 
-Progress: [██████░░░░] 66%
+Progress: [█████████░] 92%
 
 ## Performance Metrics
 
@@ -68,6 +68,7 @@ Progress: [██████░░░░] 66%
 | Phase 06.1 P01 | 4min | 2 tasks | 6 files |
 | Phase 06.1 P02 | 4min | 2 tasks | 7 files |
 | Phase 06.1 P03 | 7min | 3 tasks | 7 files |
+| Phase 07 P01 | 6min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -116,6 +117,8 @@ Recent decisions affecting current work:
 - [Phase 06.1]: Push-based MetricEvent callback (no concrete stats struct) per D-11 design
 - [Phase 06.1]: DigestError unconditionally connection-fatal (no reconnect) per RFC 7143 Section 7.3
 - [Phase 06.1]: Login logger injected via WithLoginLogger option, defaults to slog.Default()
+- [Phase 07]: All public types are value types in root package -- no internal type leakage
+- [Phase 07]: WithPDUHook adapter concatenates BHS+DataSegment into []byte to avoid exposing transport.RawPDU
 
 ### Roadmap Evolution
 
@@ -132,6 +135,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T21:32:45.011Z
-Stopped at: Phase 7 context gathered
-Resume file: .planning/phases/07-public-api-observability-and-release/07-CONTEXT.md
+Last session: 2026-04-02T08:45:18.681Z
+Stopped at: Completed 07-01-PLAN.md
+Resume file: None

@@ -111,11 +111,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### API
 
-- [ ] **API-01**: Low-level raw CDB pass-through (user builds CDB bytes, library handles iSCSI transport and response)
-- [ ] **API-02**: High-level typed Go functions (ReadBlocks, WriteBlocks, Inquiry, ReadCapacity, TestUnitReady, etc.) with structured return types
-- [ ] **API-03**: context.Context integration for cancellation and timeouts on all operations
-- [ ] **API-04**: io.Reader/io.Writer interfaces where natural (block-level sequential I/O)
-- [ ] **API-05**: Structured error types with sense data, iSCSI status, and response classification
+- [x] **API-01**: Low-level raw CDB pass-through (user builds CDB bytes, library handles iSCSI transport and response)
+- [x] **API-02**: High-level typed Go functions (ReadBlocks, WriteBlocks, Inquiry, ReadCapacity, TestUnitReady, etc.) with structured return types
+- [x] **API-03**: context.Context integration for cancellation and timeouts on all operations
+- [x] **API-04**: io.Reader/io.Writer interfaces where natural (block-level sequential I/O)
+- [x] **API-05**: Structured error types with sense data, iSCSI status, and response classification
 
 ### Observability
 
@@ -249,11 +249,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SCSI-17 | Phase 5 | Pending |
 | SCSI-18 | Phase 5 | Complete |
 | SCSI-19 | Phase 5 | Pending |
-| API-01 | Phase 7 | Pending |
-| API-02 | Phase 7 | Pending |
-| API-03 | Phase 7 | Pending |
-| API-04 | Phase 7 | Pending |
-| API-05 | Phase 7 | Pending |
+| API-01 | Phase 7 | Complete |
+| API-02 | Phase 7 | Complete |
+| API-03 | Phase 7 | Complete |
+| API-04 | Phase 7 | Complete |
+| API-05 | Phase 7 | Complete |
 | OBS-01 | Phase 7 | Complete |
 | OBS-02 | Phase 7 | Complete |
 | OBS-03 | Phase 7 | Complete |
