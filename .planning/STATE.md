@@ -151,6 +151,12 @@ None yet.
 - Verify gostor/gotgt compatibility with Go 1.25 early in Phase 1
 - Verify Go CRC32C hardware acceleration and TCP networking on NetBSD 10.1
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260402-l16 | Add --initiator-name flag to uiscsi-ls | 2026-04-02 | 00f10c9 | [260402-l16-add-initiator-iqn-support-to-uiscsi-ls-a](./quick/260402-l16-add-initiator-iqn-support-to-uiscsi-ls-a/) |
+
 ## Session Continuity
 
 Last session: 2026-04-02T13:12:24.657Z
