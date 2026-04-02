@@ -168,3 +168,13 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 5. SCSI Command Layer | 2/3 | In Progress|  |
 | 6. Error Recovery and Task Management | 0/3 | Planning complete | - |
 | 7. Public API, Observability, and Release | 0/3 | Planning complete | - |
+
+### Phase 8: lsscsi-style discovery utility
+
+**Goal:** Build a standalone CLI tool that performs iSCSI target discovery on a specified portal and presents output similar to Linux lsscsi, using the uiscsi library as its backend.
+**Requirements**: TBD
+**Depends on:** Phase 7
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 8 to break down)
