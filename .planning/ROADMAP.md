@@ -168,8 +168,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 08-01-PLAN.md — Go module setup, result types, device type table, formatters with tests
-- [ ] 08-02-PLAN.md — Probe pipeline, CLI main.go with flag parsing, signal handling, exit codes
+- [x] 08-01-PLAN.md — Go module setup, result types, device type table, formatters with tests
+- [x] 08-02-PLAN.md — Probe pipeline, CLI main.go with flag parsing, signal handling, exit codes
 
 ## Progress
 
