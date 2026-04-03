@@ -48,11 +48,20 @@ Full RFC 7143 compliance as a composable Go library — the spec is non-negotiab
 - Kernel integration / block device emulation — defeats the purpose of pure userspace
 - Boot from iSCSI — requires kernel involvement by nature
 
+## Current State (v1.0 shipped 2026-04-03)
+
+- **26,060 lines of Go** across 10 packages, zero external runtime dependencies
+- **98 requirements** verified (81 core + 17 audit remediation)
+- **19 E2E tests** against real Linux LIO kernel target
+- **22 conformance tests** against in-process mock target
+- **CLI tool:** `uiscsi-ls` for lsscsi-style discovery
+- **12 phases** completed in 4 days (270 commits)
+
 ## Context
 
 - **Domain:** iSCSI is defined by RFC 7143 (which consolidated earlier RFCs 3720, 3980, 4850, 5048). The spec is extensive with detailed PDU formats, state machines, negotiation rules, and error recovery procedures.
-- **Testing reference:** The UNH IOL iSCSI Initiator Full Feature Phase test suite (iol.unh.edu) provides a structured conformance testing framework. The test approach should be inspired by this structure.
-- **Test infrastructure:** Whether to use gotgt (Go iSCSI target), an embedded minimal target, or another approach for integration tests needs research.
+- **Testing reference:** The UNH IOL iSCSI Initiator Full Feature Phase test suite (iol.unh.edu) provides a structured conformance testing framework. Test approach inspired by this structure.
+- **Test infrastructure:** In-process mock target (`test/target.go`) for unit/conformance tests; LIO kernel target via configfs (`test/lio/`) for E2E tests.
 - **Existing landscape:** open-iscsi and libiscsi exist but are C-based and kernel-coupled. There's no mature pure-Go userspace initiator.
 - **Philosophy:** Follows The Bronx Method — standards compliance is non-negotiable, constraint-aware design (build for real hardware and real users, not imagined scale), direct communication (clear errors, no jargon), minimal ceremony (no unnecessary abstractions or configuration layers), care in execution (correctness over convenience).
 
@@ -69,12 +78,14 @@ Full RFC 7143 compliance as a composable Go library — the spec is non-negotiab
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Pure userspace, no kernel | Universal portability, embeddable in any Go app, containers, constrained environments | -- Pending |
-| Single connection per session for v1 | MC/S rarely used, simplifies state machine significantly | -- Pending |
-| Two-layer API (raw CDB + typed helpers) | Maximum flexibility for power users, convenience for common operations | -- Pending |
-| All three error recovery levels in v1 | Full spec compliance is core value — can't claim RFC 7143 without ERL 0-2 | -- Pending |
-| Full auth stack from day one | None + CHAP + mutual CHAP — CHAP is mandatory per spec for real deployments | -- Pending |
-| Bronx Method philosophy | Standards non-negotiable, minimal ceremony, constraint-aware, direct communication | -- Pending |
+| Pure userspace, no kernel | Universal portability, embeddable in any Go app, containers, constrained environments | ✓ Good — works in containers, no kernel deps |
+| Single connection per session for v1 | MC/S rarely used, simplifies state machine significantly | ✓ Good — ERL 2 connection replacement covers the recovery case |
+| Two-layer API (raw CDB + typed helpers) | Maximum flexibility for power users, convenience for common operations | ✓ Good — 25+ typed methods plus Execute() pass-through |
+| All three error recovery levels in v1 | Full spec compliance is core value — can't claim RFC 7143 without ERL 0-2 | ✓ Good — all 3 levels implemented and E2E tested |
+| Full auth stack from day one | None + CHAP + mutual CHAP — CHAP is mandatory per spec for real deployments | ✓ Good — E2E tested against LIO |
+| Bronx Method philosophy | Standards non-negotiable, minimal ceremony, constraint-aware, direct communication | ✓ Good — 98 requirements verified, zero external deps |
+| Variadic params for backward-compat extension | DigestByteOrder, maxRecvDSL added without breaking callers | ✓ Good — kept API stable during Phase 11 audit |
+| iblock + loop devices over fileio for E2E tests | fileio has kernel bugs on 6.19 for ReadCapacity | ✓ Good — reliable across kernel versions |
 
 ## Evolution
 
@@ -94,4 +105,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-03 after Phase 10 gap closure — OpReject PDU handling, SenseLength prefix stripping per RFC 7143 Section 11.4.7.2, E2E test fixes for negotiation matrix/TMF/SCSI errors. All v1.0 requirements validated.*
+*Last updated: 2026-04-03 after v1.0 milestone completion*
