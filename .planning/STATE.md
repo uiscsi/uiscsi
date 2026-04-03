@@ -154,6 +154,7 @@ Recent decisions affecting current work:
 - Phase 06.1 inserted after Phase 6: Observability and Debugging Infrastructure (URGENT) — fill all debugging gaps before E2E testing in Phase 7
 - Phase 8 added: lsscsi-style discovery utility — standalone CLI using uiscsi library
 - Phase 10 added: E2E test coverage expansion (UNH-IOL compliance gaps) — close critical gaps identified by UNH-IOL iSCSI initiator test suite comparison
+- Phase 11 added: Audit Remediation — fix all issues from Bronx Method codebase audit (17 findings across security, RFC compliance, correctness, and API quality)
 
 ### Pending Todos
 

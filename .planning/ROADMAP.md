@@ -229,3 +229,13 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 8. lsscsi-style discovery utility | 0/2 | Planning complete | - |
 | 9. LIO-based E2E test suite | 0/2 | Planning complete | - |
 | 10. E2E test coverage expansion | 5/5 | Complete    | 2026-04-03 |
+
+### Phase 11: Audit Remediation: Correctness, Security, and API Hardening
+
+**Goal:** Fix all issues from the Bronx Method codebase audit — security vulnerabilities (MaxRecvDSL enforcement, CHAP panic), RFC compliance gaps (digest byte order, residual counts, CDB length validation), correctness bugs (reconnect goroutine leaks, SNACK silent drops, ERL 2 ITT lifecycle), and API sharp edges (error wrapping, sense parse failures, error chain traversal).
+**Requirements**: AUDIT-1 through AUDIT-17
+**Depends on:** Phase 10
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 11 to break down)
