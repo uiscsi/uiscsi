@@ -91,7 +91,7 @@ func TestTMF_AbortTask(t *testing.T) {
 	var ittOnce sync.Once
 	ittCh := make(chan struct{})
 
-	hook := func(dir uiscsi.PDUDirection, data []byte) {
+	hook := func(_ context.Context, dir uiscsi.PDUDirection, data []byte) {
 		if dir == uiscsi.PDUSend && len(data) >= 48 {
 			opcode := data[0] & 0x3F
 			if opcode == 0x01 { // SCSI Command opcode
