@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 10-04-PLAN.md
-last_updated: "2026-04-03T00:13:45.312Z"
+stopped_at: Completed 10-05-PLAN.md
+last_updated: "2026-04-03T00:17:30.502Z"
 last_activity: 2026-04-02
 progress:
   total_phases: 11
-  completed_phases: 10
+  completed_phases: 11
   total_plans: 34
-  completed_plans: 33
+  completed_plans: 34
   percent: 92
 ---
 
@@ -78,6 +78,7 @@ Progress: [█████████░] 92%
 | Phase 10 P02 | 2min | 2 tasks | 2 files |
 | Phase 10 P03 | 2min | 2 tasks | 2 files |
 | Phase 10 P04 | 2min | 2 tasks | 3 files |
+| Phase 10 P05 | 1min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -145,6 +146,8 @@ Recent decisions affecting current work:
 - [Phase 10]: ERL 1/2 tests best-effort per D-04 with configfs param + t.Skip fallback
 - [Phase 10]: OpReject in unsolicited path logs+updates counters; in task path cancels task with error
 - [Phase 10]: SenseLength prefix stripped with bounds-checked slice for graceful degradation
+- [Phase 10]: Accept TMF response 255 (Function Rejected) as valid per RFC 7143 Section 11.6.1
+- [Phase 10]: ITT 0x00000000 is valid (router starts at 0); only 0xFFFFFFFF reserved per RFC 7143
 
 ### Roadmap Evolution
 
@@ -169,6 +172,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-03T00:13:45.307Z
-Stopped at: Completed 10-04-PLAN.md
+Last session: 2026-04-03T00:17:30.497Z
+Stopped at: Completed 10-05-PLAN.md
 Resume file: None

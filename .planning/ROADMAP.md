@@ -203,14 +203,14 @@ Plans:
 - SCSI CHECK CONDITION with sense data parsed and reported correctly
 - Out-of-range LBA write returns expected ILLEGAL REQUEST sense key
 - All new tests skip gracefully when not root or modules not loaded
-**Plans:** 4/5 plans executed
+**Plans:** 5/5 plans complete
 
 Plans:
 - [x] 10-01-PLAN.md — WithOperationalOverrides option, large write multi-R2T test, 2x2 negotiation matrix test
 - [x] 10-02-PLAN.md — Digest variants (header-only, data-only) and SCSI error condition tests
 - [x] 10-03-PLAN.md — ABORT TASK and TARGET WARM RESET TMFs, ERL 1/2 error recovery tests
 - [x] 10-04-PLAN.md — Gap closure: OpReject handling + SCSI Response sense data SenseLength prefix fix
-- [ ] 10-05-PLAN.md — Gap closure: negotiation test Reject handling + AbortTask TMF test fixes
+- [x] 10-05-PLAN.md — Gap closure: negotiation test Reject handling + AbortTask TMF test fixes
 
 ## Progress
 
@@ -228,4 +228,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 7. Public API, Observability, and Release | 0/3 | Planning complete | - |
 | 8. lsscsi-style discovery utility | 0/2 | Planning complete | - |
 | 9. LIO-based E2E test suite | 0/2 | Planning complete | - |
-| 10. E2E test coverage expansion | 4/5 | In Progress|  |
+| 10. E2E test coverage expansion | 5/5 | Complete   | 2026-04-03 |
