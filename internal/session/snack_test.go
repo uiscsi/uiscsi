@@ -2,6 +2,7 @@ package session
 
 import (
 	"encoding/binary"
+	"strings"
 	"testing"
 	"time"
 
@@ -278,4 +279,35 @@ func TestSNACK(t *testing.T) {
 
 		tk.stopSnackTimer()
 	})
+}
+
+// TestSNACK_SendTimeoutOnFullChannel verifies that sendSNACK returns a
+// timeout error when the write channel is full (AUDIT-6 regression test).
+func TestSNACK_SendTimeoutOnFullChannel(t *testing.T) {
+	// Create a zero-buffered channel that will always block.
+	writeCh := make(chan *transport.RawPDU)
+	tk := newTask(10, true, false)
+	tk.erl = 1
+	tk.getWriteCh = func() chan<- *transport.RawPDU { return writeCh }
+	tk.expStatSNFunc = func() uint32 { return 1 }
+
+	// sendSNACK should timeout (5s in production, but we can't wait that long).
+	// Instead, verify it returns an error rather than blocking forever by using
+	// a goroutine with a deadline.
+	done := make(chan error, 1)
+	go func() {
+		done <- tk.sendSNACK(tk.getWriteCh, SNACKTypeDataR2T, 0, 1, 1)
+	}()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected error from sendSNACK on full channel")
+		}
+		if !strings.Contains(err.Error(), "SNACK send timed out") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("sendSNACK blocked forever instead of timing out")
+	}
 }
