@@ -68,7 +68,7 @@ func (s *Session) reconnect(cause error) {
 
 	for attempt := range s.cfg.maxReconnectAttempts {
 		if attempt > 0 {
-			delay := s.cfg.reconnectBackoff * time.Duration(1<<uint(attempt-1))
+			delay := s.cfg.reconnectBackoff * time.Duration(1<<uint(max(0, attempt-1)))
 			time.Sleep(delay)
 		}
 

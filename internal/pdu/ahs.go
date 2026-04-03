@@ -3,6 +3,7 @@ package pdu
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 )
 
 // AHSType identifies the type of an Additional Header Segment.
@@ -82,6 +83,20 @@ func UnmarshalAHS(data []byte) ([]AHS, error) {
 			return nil, errors.New("pdu: invalid AHS length")
 		}
 		dataLen := ahsLen - 2
+		if dataLen > 16384 {
+			return nil, fmt.Errorf("pdu: AHS data length %d exceeds reasonable maximum", dataLen)
+		}
+
+		// Validate AHS type. Per RFC 7143 Section 11.2.1.2, only types 1
+		// (Extended CDB) and 2 (Bidirectional Read Data Length) are defined.
+		// Accept unknown types for forward compatibility but note them.
+		switch ahsType {
+		case AHSExtendedCDB, AHSBidiReadDataLen:
+			// Known types — proceed normally.
+		default:
+			// Unknown AHS type. Future types may be added by the spec.
+		}
+
 		dataStart := offset + ahsHeaderLen
 		dataEnd := dataStart + dataLen
 

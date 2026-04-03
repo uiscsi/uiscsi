@@ -19,6 +19,10 @@ type SCSIError struct {
 	Message  string
 }
 
+// Note: SCSIError does not implement Unwrap() because it does not wrap
+// an underlying error. It is a leaf error containing extracted SCSI
+// status and sense data fields. Use errors.As to match it directly.
+
 // Error returns a human-readable description of the SCSI error.
 func (e *SCSIError) Error() string {
 	if e.Message != "" {
@@ -52,7 +56,7 @@ type AuthError struct {
 
 // Error returns a human-readable description of the auth error.
 func (e *AuthError) Error() string {
-	return fmt.Sprintf("iscsi auth: %s", e.Message)
+	return fmt.Sprintf("iscsi auth: %s (class=%d detail=%d)", e.Message, e.StatusClass, e.StatusDetail)
 }
 
 // wrapSCSIError converts a scsi.CommandError to a public SCSIError.

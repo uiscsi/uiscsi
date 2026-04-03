@@ -1,5 +1,7 @@
 package pdu
 
+import "fmt"
+
 // BHSLength is the fixed size of an iSCSI Basic Header Segment in bytes.
 // All iSCSI PDUs start with exactly 48 bytes of BHS (RFC 7143 Section 11.2.1).
 const BHSLength = 48
@@ -9,7 +11,13 @@ const BHSLength = 48
 //
 // CRITICAL (Pitfall 2): Do not use binary.BigEndian.PutUint32 on bytes 4-7,
 // as that would overwrite the TotalAHSLength field in byte 4.
+//
+// Panics if dsLen exceeds the 24-bit maximum (0xFFFFFF). This is a programmer
+// error — callers must ensure the data segment length fits in 24 bits.
 func encodeDataSegmentLength(bhs []byte, dsLen uint32) {
+	if dsLen > 0xFFFFFF {
+		panic(fmt.Sprintf("pdu: DataSegmentLength %d exceeds 24-bit maximum 0xFFFFFF", dsLen))
+	}
 	bhs[5] = byte(dsLen >> 16)
 	bhs[6] = byte(dsLen >> 8)
 	bhs[7] = byte(dsLen)
