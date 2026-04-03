@@ -448,6 +448,25 @@ func (s *Session) handleUnsolicited(raw *transport.RawPDU) {
 		s.handleUnsolicitedNOPIn(raw)
 	case pdu.OpAsyncMsg:
 		s.handleAsyncMsg(raw)
+	case pdu.OpReject:
+		decoded, err := pdu.DecodeBHS(raw.BHS)
+		if err != nil {
+			s.cfg.logger.Warn("session: failed to decode Reject PDU",
+				"error", err)
+			return
+		}
+		reject := decoded.(*pdu.Reject)
+		reject.Data = raw.DataSegment
+
+		s.cfg.logger.Warn("session: received unsolicited Reject PDU",
+			"reason", fmt.Sprintf("0x%02X", reject.Reason))
+		if len(reject.Data) >= 1 {
+			s.cfg.logger.Warn("session: rejected PDU opcode",
+				"opcode", fmt.Sprintf("0x%02X", reject.Data[0]&0x3f))
+		}
+
+		s.updateStatSN(reject.StatSN)
+		s.window.update(reject.ExpCmdSN, reject.MaxCmdSN)
 	default:
 		s.cfg.logger.Warn("session: unhandled unsolicited PDU",
 			"opcode", fmt.Sprintf("0x%02X", opcode))
@@ -522,6 +541,14 @@ func (s *Session) taskLoop(tk *task, pduCh <-chan *transport.RawPDU) {
 					Latency: time.Since(tk.startTime),
 				})
 			}
+			s.cleanupTask(tk.itt)
+			return
+
+		case *pdu.Reject:
+			p.Data = raw.DataSegment
+			s.window.update(p.ExpCmdSN, p.MaxCmdSN)
+			s.updateStatSN(p.StatSN)
+			tk.cancel(fmt.Errorf("session: target rejected PDU (reason=0x%02X, itt=0x%08x)", p.Reason, tk.itt))
 			s.cleanupTask(tk.itt)
 			return
 
