@@ -4,6 +4,7 @@ package uiscsi
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/rkujawa/uiscsi/internal/scsi"
@@ -57,10 +58,22 @@ func (s *Session) submitAndCheck(ctx context.Context, cmd session.Command) ([]by
 				se.ASC = sd.ASC
 				se.ASCQ = sd.ASCQ
 				se.Message = sd.String()
+			} else {
+				se.Message = fmt.Sprintf("sense data present but unparseable: %v", parseErr)
 			}
 		}
 		return nil, se
 	}
+	// Check for residual overflow (target received more data than expected).
+	if result.Overflow {
+		return nil, &SCSIError{
+			Status:  result.Status,
+			Message: fmt.Sprintf("residual overflow: %d bytes", result.ResidualCount),
+		}
+	}
+	// Check for residual underflow (less data than expected).
+	// Underflow with Status==0 is acceptable (short read); the data reader
+	// already contains only the received bytes.
 	if result.Data != nil {
 		return io.ReadAll(result.Data)
 	}
@@ -317,6 +330,13 @@ func (s *Session) Execute(ctx context.Context, lun uint64, cdb []byte, opts ...E
 	cfg := &executeConfig{}
 	for _, o := range opts {
 		o(cfg)
+	}
+
+	if len(cdb) == 0 {
+		return nil, fmt.Errorf("iscsi execute: empty CDB")
+	}
+	if len(cdb) > 16 {
+		return nil, fmt.Errorf("iscsi execute: CDB length %d exceeds maximum 16 bytes (AHS Extended CDB not yet supported)", len(cdb))
 	}
 
 	var cmd session.Command
