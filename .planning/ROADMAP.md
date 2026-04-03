@@ -235,7 +235,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 **Goal:** Fix all issues from the Bronx Method codebase audit — security vulnerabilities (MaxRecvDSL enforcement, CHAP panic), RFC compliance gaps (digest byte order, residual counts, CDB length validation), correctness bugs (reconnect goroutine leaks, SNACK silent drops, ERL 2 ITT lifecycle), and API sharp edges (error wrapping, sense parse failures, error chain traversal).
 **Requirements**: AUDIT-1 through AUDIT-17
 **Depends on:** Phase 10
-**Plans:** 4 plans
+**Plans:** 4/4 plans complete
 
 Plans:
 - [ ] 11-01-PLAN.md — CRITICAL security fixes: MaxRecvDSL enforcement, CHAP panic removal, error wrapping fix
