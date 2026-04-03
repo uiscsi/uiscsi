@@ -48,7 +48,7 @@ Plans:
   3. All RFC 7143 Section 13 mandatory operational parameters are negotiated correctly (HeaderDigest, DataDigest, MaxRecvDataSegmentLength, MaxBurstLength, FirstBurstLength, ImmediateData, InitialR2T, etc.)
   4. When HeaderDigest=CRC32C or DataDigest=CRC32C is negotiated, received PDUs with incorrect digests are detected and rejected
   5. Parameterized tests cover the negotiation parameter matrix (boolean AND/OR, numerical min/max, string list semantics)
-**Plans:** 3/3 plans complete
+**Plans:** 5 plans (3 complete + 2 gap closure)
 Plans:
 - [x] 02-01-PLAN.md — Text codec, negotiation engine, NegotiatedParams, LoginError
 - [x] 02-02-PLAN.md — CHAP authentication (one-way and mutual)
@@ -132,7 +132,7 @@ Plans:
   5. Login stage transitions, task lifecycle, and command window changes are logged via slog at Debug level
   6. Connection-level metrics (PDU counts by type, bytes in/out, command latency) are available to consumers
   7. Full PDU exchanges are traceable at slog Debug level
-**Plans:** 3/3 plans complete
+**Plans:** 5 plans (3 complete + 2 gap closure)
 Plans:
 - [x] 06.1-01-PLAN.md — DigestError type, digest verification in ReadRawPDU, PDU String() methods
 - [x] 06.1-02-PLAN.md — PDU hooks, metrics events, pump logger injection
@@ -203,12 +203,14 @@ Plans:
 - SCSI CHECK CONDITION with sense data parsed and reported correctly
 - Out-of-range LBA write returns expected ILLEGAL REQUEST sense key
 - All new tests skip gracefully when not root or modules not loaded
-**Plans:** 3/3 plans complete
+**Plans:** 5 plans (3 complete + 2 gap closure)
 
 Plans:
 - [x] 10-01-PLAN.md — WithOperationalOverrides option, large write multi-R2T test, 2x2 negotiation matrix test
 - [x] 10-02-PLAN.md — Digest variants (header-only, data-only) and SCSI error condition tests
 - [x] 10-03-PLAN.md — ABORT TASK and TARGET WARM RESET TMFs, ERL 1/2 error recovery tests
+- [ ] 10-04-PLAN.md — Gap closure: OpReject handling + SCSI Response sense data SenseLength prefix fix
+- [ ] 10-05-PLAN.md — Gap closure: negotiation test Reject handling + AbortTask TMF test fixes
 
 ## Progress
 
