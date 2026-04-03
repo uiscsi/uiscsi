@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -460,13 +461,32 @@ func (s *Session) handleUnsolicited(raw *transport.RawPDU) {
 
 		s.cfg.logger.Warn("session: received unsolicited Reject PDU",
 			"reason", fmt.Sprintf("0x%02X", reject.Reason))
-		if len(reject.Data) >= 1 {
-			s.cfg.logger.Warn("session: rejected PDU opcode",
-				"opcode", fmt.Sprintf("0x%02X", reject.Data[0]&0x3f))
-		}
 
 		s.updateStatSN(reject.StatSN)
 		s.window.update(reject.ExpCmdSN, reject.MaxCmdSN)
+
+		// The Reject data segment contains the complete BHS of the rejected
+		// PDU. Extract the ITT (bytes 16-19) to cancel the corresponding task.
+		if len(reject.Data) >= 20 {
+			rejectedOpcode := reject.Data[0] & 0x3f
+			rejectedITT := binary.BigEndian.Uint32(reject.Data[16:20])
+			s.cfg.logger.Warn("session: rejected PDU",
+				"opcode", fmt.Sprintf("0x%02X", rejectedOpcode),
+				"itt", fmt.Sprintf("0x%08X", rejectedITT))
+
+			if rejectedITT != 0xFFFFFFFF {
+				s.mu.Lock()
+				tk, ok := s.tasks[rejectedITT]
+				s.mu.Unlock()
+				if ok {
+					tk.cancel(fmt.Errorf("session: target rejected PDU (reason=0x%02X, itt=0x%08x)", reject.Reason, rejectedITT))
+					s.cleanupTask(rejectedITT)
+				}
+			}
+		} else if len(reject.Data) >= 1 {
+			s.cfg.logger.Warn("session: rejected PDU opcode",
+				"opcode", fmt.Sprintf("0x%02X", reject.Data[0]&0x3f))
+		}
 	default:
 		s.cfg.logger.Warn("session: unhandled unsolicited PDU",
 			"opcode", fmt.Sprintf("0x%02X", opcode))
