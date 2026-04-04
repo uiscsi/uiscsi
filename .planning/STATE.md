@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
+milestone: v1.1
+milestone_name: Full Test Compliance and Coverage
 status: executing
-stopped_at: Completed 13-01-PLAN.md
-last_updated: "2026-04-04T22:25:42.782Z"
-last_activity: 2026-04-05
+stopped_at: Completed 13-02-PLAN.md
+last_updated: "2026-04-04T22:33:30.491Z"
+last_activity: 2026-04-04
 progress:
-  total_phases: 1
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 1
+  total_phases: 7
+  completed_phases: 1
+  total_plans: 2
+  completed_plans: 2
   percent: 93
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 ## Current Position
 
 Phase: 13
-Plan: 1 of 2
-Status: Executing Phase 13
-Last activity: 2026-04-05
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-04-04
 
 Progress: [█████████░] 93%
 
@@ -80,6 +80,7 @@ Progress: [█████████░] 93%
 | Phase 10 P04 | 2min | 2 tasks | 3 files |
 | Phase 10 P05 | 1min | 2 tasks | 2 files |
 | Phase 13 P01 | 4min | 2 tasks | 4 files |
+| Phase 13 P02 | 3min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -152,6 +153,8 @@ Recent decisions affecting current work:
 - [Phase 13]: PDU capture Recorder decodes via pdu.DecodeBHS for typed field assertions
 - [Phase 13]: SessionState.Update handles immediate vs non-immediate CmdSN advancement per RFC 7143
 - [Phase 13]: HandleSCSIFunc uses atomic.Int32 for goroutine-safe call counter
+- [Phase 13]: Solicited NOP-In from target (TTT!=0xFFFFFFFF) to trigger deterministic NOP-Out in conformance tests
+- [Phase 13]: Custom NOP-Out handler with SessionState.Update(immediate=true) for correct ExpCmdSN in CmdSN conformance tests
 
 ### Roadmap Evolution
 
@@ -178,6 +181,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-04T22:25:18.733Z
-Stopped at: Completed 13-01-PLAN.md
+Last session: 2026-04-04T22:33:30.485Z
+Stopped at: Completed 13-02-PLAN.md
 Resume file: None

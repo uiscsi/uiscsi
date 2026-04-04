@@ -9,9 +9,9 @@
 
 ### Command Sequencing
 
-- [ ] **CMDSEQ-01**: E2E test validates CmdSN increments by 1 for each non-immediate command on wire (FFP #1.1)
-- [ ] **CMDSEQ-02**: E2E test validates immediate delivery flag and CmdSN for non-TMF commands (FFP #2.1)
-- [ ] **CMDSEQ-03**: E2E test validates immediate delivery CmdSN for task management commands (FFP #2.2)
+- [x] **CMDSEQ-01**: E2E test validates CmdSN increments by 1 for each non-immediate command on wire (FFP #1.1)
+- [x] **CMDSEQ-02**: E2E test validates immediate delivery flag and CmdSN for non-TMF commands (FFP #2.1)
+- [x] **CMDSEQ-03**: E2E test validates immediate delivery CmdSN for task management commands (FFP #2.2)
 - [ ] **CMDSEQ-04**: E2E test validates initiator respects zero command window (MaxCmdSN=ExpCmdSN-1) (FFP #3.1)
 - [ ] **CMDSEQ-05**: E2E test validates initiator uses large command window correctly (FFP #3.2)
 - [ ] **CMDSEQ-06**: E2E test validates initiator respects command window size of 1 (FFP #3.3)
