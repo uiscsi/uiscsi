@@ -2,6 +2,7 @@ package test
 
 import (
 	"net"
+	"sync"
 	"testing"
 
 	"github.com/rkujawa/uiscsi/internal/login"
@@ -299,5 +300,154 @@ func sendLoginOperationalPhase(t *testing.T, conn net.Conn) {
 	}
 	if resp.NSG != 3 {
 		t.Fatalf("operational phase: NSG %d, want 3", resp.NSG)
+	}
+}
+
+func TestHandleSCSIFunc_CallCount(t *testing.T) {
+	tgt, err := NewMockTarget()
+	if err != nil {
+		t.Fatalf("NewMockTarget: %v", err)
+	}
+	defer tgt.Close()
+
+	tgt.HandleLogin()
+	tgt.HandleLogout()
+
+	var mu sync.Mutex
+	counts := []int{}
+
+	tgt.HandleSCSIFunc(func(tc *TargetConn, cmd *pdu.SCSICommand, callCount int) error {
+		mu.Lock()
+		counts = append(counts, callCount)
+		mu.Unlock()
+
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
+		statSN := tc.NextStatSN()
+		resp := &pdu.SCSIResponse{
+			Header: pdu.Header{
+				Final:            true,
+				InitiatorTaskTag: cmd.InitiatorTaskTag,
+			},
+			Status:   0x00,
+			StatSN:   statSN,
+			ExpCmdSN: expCmdSN,
+			MaxCmdSN: maxCmdSN,
+		}
+		return tc.SendPDU(resp)
+	})
+
+	conn, err := net.Dial("tcp", tgt.Addr())
+	if err != nil {
+		t.Fatalf("Dial: %v", err)
+	}
+	defer conn.Close()
+
+	sendLoginSecurityPhase(t, conn)
+	sendLoginOperationalPhase(t, conn)
+
+	// Send 3 SCSI commands.
+	for i := range 3 {
+		cmd := &pdu.SCSICommand{
+			Header: pdu.Header{
+				Final:            true,
+				InitiatorTaskTag: uint32(i + 1),
+			},
+			CmdSN:     uint32(i + 1),
+			ExpStatSN: 3,
+		}
+		cmd.CDB[0] = 0x00 // TEST UNIT READY
+
+		raw, err := BuildRawPDU(cmd)
+		if err != nil {
+			t.Fatalf("BuildRawPDU[%d]: %v", i, err)
+		}
+		if err := transport.WriteRawPDU(conn, raw); err != nil {
+			t.Fatalf("WriteRawPDU[%d]: %v", i, err)
+		}
+
+		respRaw, err := transport.ReadRawPDU(conn, false, false, 0)
+		if err != nil {
+			t.Fatalf("ReadRawPDU[%d]: %v", i, err)
+		}
+		resp := &pdu.SCSIResponse{}
+		resp.UnmarshalBHS(respRaw.BHS)
+		if resp.Status != 0x00 {
+			t.Fatalf("command %d: Status 0x%02X, want 0x00", i, resp.Status)
+		}
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(counts) != 3 {
+		t.Fatalf("call count: got %d calls, want 3", len(counts))
+	}
+	for i, c := range counts {
+		if c != i {
+			t.Errorf("callCount[%d]: got %d, want %d", i, c, i)
+		}
+	}
+}
+
+func TestSessionState_Update(t *testing.T) {
+	ss := NewSessionState()
+
+	// First call initializes and advances for non-immediate.
+	expCmdSN, maxCmdSN := ss.Update(5, false)
+	if expCmdSN != 6 {
+		t.Errorf("after first Update(5, false): ExpCmdSN = %d, want 6", expCmdSN)
+	}
+	if maxCmdSN != 16 { // 6 + 10
+		t.Errorf("after first Update(5, false): MaxCmdSN = %d, want 16", maxCmdSN)
+	}
+
+	// Non-immediate advances.
+	expCmdSN, maxCmdSN = ss.Update(6, false)
+	if expCmdSN != 7 {
+		t.Errorf("after Update(6, false): ExpCmdSN = %d, want 7", expCmdSN)
+	}
+	if maxCmdSN != 17 { // 7 + 10
+		t.Errorf("after Update(6, false): MaxCmdSN = %d, want 17", maxCmdSN)
+	}
+
+	// Immediate does NOT advance ExpCmdSN.
+	expCmdSN, maxCmdSN = ss.Update(7, true)
+	if expCmdSN != 7 { // unchanged
+		t.Errorf("after Update(7, true): ExpCmdSN = %d, want 7", expCmdSN)
+	}
+	if maxCmdSN != 17 { // 7 + 10
+		t.Errorf("after Update(7, true): MaxCmdSN = %d, want 17", maxCmdSN)
+	}
+
+	// Accessor matches.
+	if got := ss.ExpCmdSN(); got != 7 {
+		t.Errorf("ExpCmdSN() = %d, want 7", got)
+	}
+}
+
+func TestSessionState_SetMaxCmdSNDelta(t *testing.T) {
+	ss := NewSessionState()
+
+	// Initialize.
+	ss.Update(10, false)
+
+	// Change delta.
+	ss.SetMaxCmdSNDelta(3)
+
+	expCmdSN, maxCmdSN := ss.Update(11, false)
+	if expCmdSN != 12 {
+		t.Errorf("ExpCmdSN = %d, want 12", expCmdSN)
+	}
+	if maxCmdSN != 15 { // 12 + 3
+		t.Errorf("MaxCmdSN = %d, want 15", maxCmdSN)
+	}
+
+	// Negative delta (closed window).
+	ss.SetMaxCmdSNDelta(-1)
+	expCmdSN, maxCmdSN = ss.Update(12, false)
+	if expCmdSN != 13 {
+		t.Errorf("ExpCmdSN = %d, want 13", expCmdSN)
+	}
+	if maxCmdSN != 12 { // 13 + (-1) = 12, which is < ExpCmdSN (closed window)
+		t.Errorf("MaxCmdSN = %d, want 12", maxCmdSN)
 	}
 }

@@ -62,6 +62,53 @@ func (tc *TargetConn) Close() error {
 	return tc.nc.Close()
 }
 
+// SessionState tracks target-side command sequencing state.
+// Handlers call Update() to get correct ExpCmdSN/MaxCmdSN for responses
+// instead of hardcoding cmd.CmdSN+1/cmd.CmdSN+10.
+type SessionState struct {
+	mu            sync.Mutex
+	expCmdSN      uint32
+	maxCmdSNDelta int32 // MaxCmdSN = ExpCmdSN + delta; default 10
+	initialized   bool
+}
+
+// NewSessionState returns a SessionState with a default MaxCmdSN delta of 10.
+func NewSessionState() *SessionState {
+	return &SessionState{maxCmdSNDelta: 10}
+}
+
+// Update advances ExpCmdSN based on the received command's CmdSN and returns
+// the current ExpCmdSN and MaxCmdSN for use in response PDUs. Immediate
+// commands do not advance ExpCmdSN per RFC 7143 Section 3.2.2.1.
+func (ss *SessionState) Update(cmdSN uint32, immediate bool) (expCmdSN, maxCmdSN uint32) {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+	if !ss.initialized {
+		ss.expCmdSN = cmdSN
+		ss.initialized = true
+	}
+	if !immediate {
+		ss.expCmdSN = cmdSN + 1
+	}
+	maxCmdSN = uint32(int32(ss.expCmdSN) + ss.maxCmdSNDelta)
+	return ss.expCmdSN, maxCmdSN
+}
+
+// SetMaxCmdSNDelta configures the delta between ExpCmdSN and MaxCmdSN.
+// Use negative values to create a closed command window for flow control tests.
+func (ss *SessionState) SetMaxCmdSNDelta(delta int32) {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+	ss.maxCmdSNDelta = delta
+}
+
+// ExpCmdSN returns the current expected command sequence number.
+func (ss *SessionState) ExpCmdSN() uint32 {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+	return ss.expCmdSN
+}
+
 // MockTarget is an in-process iSCSI target for testing.
 // It listens on a local TCP port, accepts connections, and dispatches
 // received PDUs to registered handlers by opcode.
@@ -74,6 +121,7 @@ type MockTarget struct {
 	wg       sync.WaitGroup
 	closed   atomic.Bool
 	strict   bool // if true, unhandled opcodes close the connection
+	session  *SessionState
 }
 
 // SetStrictMode configures whether unhandled opcodes cause connection errors.
@@ -97,6 +145,7 @@ func NewMockTarget() (*MockTarget, error) {
 		listener: ln,
 		handlers: make(map[pdu.OpCode]PDUHandler),
 		done:     make(chan struct{}),
+		session:  NewSessionState(),
 	}
 
 	mt.wg.Add(1)
@@ -115,6 +164,25 @@ func (mt *MockTarget) Handle(opcode pdu.OpCode, h PDUHandler) {
 	mt.mu.Lock()
 	defer mt.mu.Unlock()
 	mt.handlers[opcode] = h
+}
+
+// Session returns the MockTarget's SessionState for configuring command
+// window behavior in tests.
+func (mt *MockTarget) Session() *SessionState {
+	return mt.session
+}
+
+// HandleSCSIFunc registers a flexible SCSI command handler where the test
+// function receives the decoded *pdu.SCSICommand and a 0-based call counter.
+// This replaces any previously registered OpSCSICommand handler (HandleSCSIRead,
+// HandleSCSIWrite, HandleSCSIError).
+func (mt *MockTarget) HandleSCSIFunc(h func(tc *TargetConn, cmd *pdu.SCSICommand, callCount int) error) {
+	var count atomic.Int32
+	mt.Handle(pdu.OpSCSICommand, func(tc *TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
+		cmd := decoded.(*pdu.SCSICommand)
+		n := int(count.Add(1) - 1)
+		return h(tc, cmd, n)
+	})
 }
 
 // Conns returns the currently tracked connections.
@@ -237,6 +305,10 @@ func (mt *MockTarget) HandleLogin() {
 	mt.Handle(pdu.OpLoginReq, func(tc *TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
 		req := decoded.(*pdu.LoginReq)
 		kvs := login.DecodeTextKV(req.Data)
+
+		// Seed SessionState with login CmdSN so ExpCmdSN is correct
+		// for the first full-feature phase command.
+		mt.session.Update(req.CmdSN, false)
 
 		switch req.CSG {
 		case 0: // Security Negotiation
