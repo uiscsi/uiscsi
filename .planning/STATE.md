@@ -1,36 +1,36 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: executing
-stopped_at: Completed 10-05-PLAN.md
-last_updated: "2026-04-03T10:45:48.742Z"
-last_activity: 2026-04-03
+milestone: v1.1
+milestone_name: Full Test Compliance and Coverage
+status: defining-requirements
+stopped_at: null
+last_updated: "2026-04-04T21:00:00.000Z"
+last_activity: 2026-04-04
 progress:
-  total_phases: 12
-  completed_phases: 12
-  total_plans: 38
-  completed_plans: 38
-  percent: 92
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-31)
+See: .planning/PROJECT.md (updated 2026-04-04)
 
 **Core value:** Full RFC 7143 compliance as a composable Go library
-**Current focus:** Phase 11 — audit-remediation-correctness-security-and-api-hardening
+**Current focus:** v1.1 — Full Test Compliance and Coverage
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
-Status: Executing Phase 11
-Last activity: 2026-04-04 - Completed quick task 260404-vq3: Build test matrix comparing E2E tests to initiator_ffp.pdf tests
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-04 — Milestone v1.1 started
 
-Progress: [█████████░] 92%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -171,7 +171,7 @@ None yet.
 |---|-------------|------|--------|-----------|
 | 260402-l16 | Add --initiator-name flag to uiscsi-ls | 2026-04-02 | 00f10c9 | [260402-l16-add-initiator-iqn-support-to-uiscsi-ls-a](./quick/260402-l16-add-initiator-iqn-support-to-uiscsi-ls-a/) |
 | 260403-h34 | Fix up documentation gaps | 2026-04-03 | fe0202f | [260403-h34-fix-up-documentation-gaps](./quick/260403-h34-fix-up-documentation-gaps/) |
-| 260404-vq3 | Build test matrix comparing E2E tests to initiator_ffp.pdf tests | 2026-04-04 | pending | [260404-vq3-build-test-matrix-comparing-e2e-tests-to](./quick/260404-vq3-build-test-matrix-comparing-e2e-tests-to/) |
+| 260404-vq3 | Build test matrix comparing E2E tests to initiator_ffp.pdf tests | 2026-04-04 | 09832c6 | [260404-vq3-build-test-matrix-comparing-e2e-tests-to](./quick/260404-vq3-build-test-matrix-comparing-e2e-tests-to/) |
 
 ## Session Continuity
 

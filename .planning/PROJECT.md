@@ -38,7 +38,7 @@ Full RFC 7143 compliance as a composable Go library — the spec is non-negotiab
 
 ### Active
 
-(No active requirements — all v1.0 requirements validated)
+(Requirements being defined for v1.1 — see REQUIREMENTS.md)
 
 ### Out of Scope
 
@@ -47,6 +47,19 @@ Full RFC 7143 compliance as a composable Go library — the spec is non-negotiab
 - iSNS discovery — SendTargets sufficient for v1, iSNS adds protocol dependency
 - Kernel integration / block device emulation — defeats the purpose of pure userspace
 - Boot from iSCSI — requires kernel involvement by nature
+
+## Current Milestone: v1.1 Full Test Compliance and Coverage
+
+**Goal:** Achieve full UNH-IOL Initiator FFP test suite coverage — promote all 62 tests from partial/not-covered to covered with wire-level E2E validation.
+
+**Target features:**
+- PDU-level wire validation for all 22 partially-covered tests (CmdSN, DataSN, F-bit, TTT, Buffer Offset assertions)
+- SCSI error status handling tests: BUSY, RESERVATION CONFLICT, CRC error sense, SNACK reject
+- Async message handling tests: target logout request, connection drop, session drop, negotiation request
+- Task management gaps: Abort Task Set, TMF field validation, Text Request advanced features
+- ERL 2 connection reassignment and task reassign wire-level tests
+- Command window E2E tests: zero window, large window, window-of-1
+- Remaining FFP tests: immediate delivery, command retry, ExpStatSN gap, zero-length Data-In, R2T ordering, NOP-Out variants
 
 ## Current State (v1.0 shipped 2026-04-03)
 
@@ -105,4 +118,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-03 after v1.0 milestone completion*
+*Last updated: 2026-04-04 — v1.1 milestone started*
