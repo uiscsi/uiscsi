@@ -593,3 +593,463 @@ func TestDataOut_BufferOffset(t *testing.T) {
 		}
 	}
 }
+
+// TestDataOut_UnsolicitedFirstBurst verifies that unsolicited data (immediate +
+// unsolicited Data-Out) respects FirstBurstLength, with solicited R2T follow-up
+// for remaining data.
+// Conformance: DATA-02 (FFP #8.1)
+func TestDataOut_UnsolicitedFirstBurst(t *testing.T) {
+	rec := &pducapture.Recorder{}
+
+	tgt, err := testutil.NewMockTarget()
+	if err != nil {
+		t.Fatalf("NewMockTarget: %v", err)
+	}
+	t.Cleanup(func() { tgt.Close() })
+
+	// Bilateral: ImmediateData=Yes, InitialR2T=No, FBL=1024, MaxRecvDSL=512.
+	tgt.SetNegotiationConfig(testutil.NegotiationConfig{
+		ImmediateData:            testutil.BoolPtr(true),
+		InitialR2T:               testutil.BoolPtr(false),
+		FirstBurstLength:         testutil.Uint32Ptr(1024),
+		MaxRecvDataSegmentLength: testutil.Uint32Ptr(512),
+	})
+
+	tgt.HandleLogin()
+	tgt.HandleLogout()
+	tgt.HandleNOPOut()
+	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+
+		// SCSI Command carries immediate data. Read unsolicited Data-Out until F-bit.
+		unsolicited, err := testutil.ReadDataOutPDUs(tc)
+		if err != nil {
+			return err
+		}
+		_ = unsolicited
+
+		// Send R2T for remaining data (EDTL - FBL = 2048 - 1024 = 1024).
+		remaining := cmd.ExpectedDataTransferLength - 1024
+		r2t := &pdu.R2T{
+			Header: pdu.Header{
+				Final:            true,
+				InitiatorTaskTag: cmd.InitiatorTaskTag,
+			},
+			TargetTransferTag:         0x00000002,
+			StatSN:                    tc.StatSN(),
+			ExpCmdSN:                  expCmdSN,
+			MaxCmdSN:                  maxCmdSN,
+			R2TSN:                     0,
+			BufferOffset:              1024,
+			DesiredDataTransferLength: remaining,
+		}
+		if err := tc.SendPDU(r2t); err != nil {
+			return err
+		}
+
+		if _, err := testutil.ReadDataOutPDUs(tc); err != nil {
+			return err
+		}
+
+		resp := &pdu.SCSIResponse{
+			Header: pdu.Header{
+				Final:            true,
+				InitiatorTaskTag: cmd.InitiatorTaskTag,
+			},
+			Status:   0x00,
+			StatSN:   tc.NextStatSN(),
+			ExpCmdSN: expCmdSN,
+			MaxCmdSN: maxCmdSN,
+		}
+		return tc.SendPDU(resp)
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	sess, err := uiscsi.Dial(ctx, tgt.Addr(),
+		uiscsi.WithPDUHook(rec.Hook()),
+		uiscsi.WithKeepaliveInterval(30*time.Second),
+		uiscsi.WithOperationalOverrides(map[string]string{
+			"ImmediateData": "Yes",
+			"InitialR2T":    "No",
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Dial: %v", err)
+	}
+	t.Cleanup(func() { sess.Close() })
+
+	data := make([]byte, 2048)
+	if err := sess.WriteBlocks(ctx, 0, 0, 4, 512, data); err != nil {
+		t.Fatalf("WriteBlocks: %v", err)
+	}
+
+	// Pitfall 5: Immediate data is in SCSI Command DataSegmentLen, not a Data-Out.
+	cmds := rec.Sent(pdu.OpSCSICommand)
+	if len(cmds) < 1 {
+		t.Fatalf("captured SCSI commands: got %d, want >= 1", len(cmds))
+	}
+	scsiCmd := cmds[0].Decoded.(*pdu.SCSICommand)
+	immediateLen := scsiCmd.DataSegmentLen
+
+	// Sum unsolicited Data-Out (TTT=0xFFFFFFFF).
+	var unsolicitedLen uint32
+	var solicitedCount int
+	douts := rec.Sent(pdu.OpDataOut)
+	for _, c := range douts {
+		dout := c.Decoded.(*pdu.DataOut)
+		if dout.TargetTransferTag == 0xFFFFFFFF {
+			unsolicitedLen += dout.DataSegmentLen
+		} else {
+			solicitedCount++
+		}
+	}
+
+	totalUnsolicited := immediateLen + unsolicitedLen
+	if totalUnsolicited > 1024 {
+		t.Errorf("unsolicited total (immediate %d + Data-Out %d = %d) exceeds FirstBurstLength 1024",
+			immediateLen, unsolicitedLen, totalUnsolicited)
+	}
+
+	// Verify solicited Data-Out PDUs are also present.
+	if solicitedCount < 1 {
+		t.Errorf("expected solicited Data-Out PDUs, got %d", solicitedCount)
+	}
+}
+
+// TestDataOut_NoUnsolicited verifies that no unsolicited data is sent when
+// ImmediateData=No and InitialR2T=Yes.
+// Conformance: DATA-03 (FFP #8.2)
+func TestDataOut_NoUnsolicited(t *testing.T) {
+	rec := &pducapture.Recorder{}
+
+	tgt, err := testutil.NewMockTarget()
+	if err != nil {
+		t.Fatalf("NewMockTarget: %v", err)
+	}
+	t.Cleanup(func() { tgt.Close() })
+
+	tgt.SetNegotiationConfig(testutil.NegotiationConfig{
+		ImmediateData: testutil.BoolPtr(false),
+		InitialR2T:    testutil.BoolPtr(true),
+	})
+
+	tgt.HandleLogin()
+	tgt.HandleLogout()
+	tgt.HandleNOPOut()
+	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+
+		r2t := &pdu.R2T{
+			Header: pdu.Header{
+				Final:            true,
+				InitiatorTaskTag: cmd.InitiatorTaskTag,
+			},
+			TargetTransferTag:         0x00000001,
+			StatSN:                    tc.StatSN(),
+			ExpCmdSN:                  expCmdSN,
+			MaxCmdSN:                  maxCmdSN,
+			R2TSN:                     0,
+			BufferOffset:              0,
+			DesiredDataTransferLength: cmd.ExpectedDataTransferLength,
+		}
+		if err := tc.SendPDU(r2t); err != nil {
+			return err
+		}
+
+		if _, err := testutil.ReadDataOutPDUs(tc); err != nil {
+			return err
+		}
+
+		resp := &pdu.SCSIResponse{
+			Header: pdu.Header{
+				Final:            true,
+				InitiatorTaskTag: cmd.InitiatorTaskTag,
+			},
+			Status:   0x00,
+			StatSN:   tc.NextStatSN(),
+			ExpCmdSN: expCmdSN,
+			MaxCmdSN: maxCmdSN,
+		}
+		return tc.SendPDU(resp)
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	sess, err := uiscsi.Dial(ctx, tgt.Addr(),
+		uiscsi.WithPDUHook(rec.Hook()),
+		uiscsi.WithKeepaliveInterval(30*time.Second),
+		uiscsi.WithOperationalOverrides(map[string]string{
+			"ImmediateData": "No",
+			"InitialR2T":    "Yes",
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Dial: %v", err)
+	}
+	t.Cleanup(func() { sess.Close() })
+
+	data := make([]byte, 1024)
+	if err := sess.WriteBlocks(ctx, 0, 0, 2, 512, data); err != nil {
+		t.Fatalf("WriteBlocks: %v", err)
+	}
+
+	// Verify SCSI Command has no immediate data.
+	cmds := rec.Sent(pdu.OpSCSICommand)
+	if len(cmds) < 1 {
+		t.Fatalf("captured SCSI commands: got %d, want >= 1", len(cmds))
+	}
+	scsiCmd := cmds[0].Decoded.(*pdu.SCSICommand)
+	if scsiCmd.DataSegmentLen != 0 {
+		t.Errorf("SCSI Command DataSegmentLen=%d, want 0 (no immediate data)", scsiCmd.DataSegmentLen)
+	}
+
+	// Verify no Data-Out has TTT=0xFFFFFFFF (unsolicited).
+	douts := rec.Sent(pdu.OpDataOut)
+	for i, c := range douts {
+		dout := c.Decoded.(*pdu.DataOut)
+		if dout.TargetTransferTag == 0xFFFFFFFF {
+			t.Errorf("DataOut[%d] has TTT=0xFFFFFFFF (unsolicited), want solicited only", i)
+		}
+	}
+}
+
+// TestDataOut_FirstBurstLimit verifies that the total unsolicited data
+// (immediate + unsolicited Data-Out) exactly respects FirstBurstLength.
+// Conformance: DATA-04 (FFP #8.3)
+func TestDataOut_FirstBurstLimit(t *testing.T) {
+	rec := &pducapture.Recorder{}
+
+	tgt, err := testutil.NewMockTarget()
+	if err != nil {
+		t.Fatalf("NewMockTarget: %v", err)
+	}
+	t.Cleanup(func() { tgt.Close() })
+
+	// FBL=768, MaxRecvDSL=256: immediate 256 + 2x256 unsolicited Data-Out = 768.
+	tgt.SetNegotiationConfig(testutil.NegotiationConfig{
+		ImmediateData:            testutil.BoolPtr(true),
+		InitialR2T:               testutil.BoolPtr(false),
+		FirstBurstLength:         testutil.Uint32Ptr(768),
+		MaxRecvDataSegmentLength: testutil.Uint32Ptr(256),
+	})
+
+	tgt.HandleLogin()
+	tgt.HandleLogout()
+	tgt.HandleNOPOut()
+	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+
+		// Read unsolicited Data-Out until F-bit.
+		unsolicited, err := testutil.ReadDataOutPDUs(tc)
+		if err != nil {
+			return err
+		}
+		_ = unsolicited
+
+		// Send R2T for remaining data.
+		remaining := cmd.ExpectedDataTransferLength - 768
+		r2t := &pdu.R2T{
+			Header: pdu.Header{
+				Final:            true,
+				InitiatorTaskTag: cmd.InitiatorTaskTag,
+			},
+			TargetTransferTag:         0x00000003,
+			StatSN:                    tc.StatSN(),
+			ExpCmdSN:                  expCmdSN,
+			MaxCmdSN:                  maxCmdSN,
+			R2TSN:                     0,
+			BufferOffset:              768,
+			DesiredDataTransferLength: remaining,
+		}
+		if err := tc.SendPDU(r2t); err != nil {
+			return err
+		}
+
+		if _, err := testutil.ReadDataOutPDUs(tc); err != nil {
+			return err
+		}
+
+		resp := &pdu.SCSIResponse{
+			Header: pdu.Header{
+				Final:            true,
+				InitiatorTaskTag: cmd.InitiatorTaskTag,
+			},
+			Status:   0x00,
+			StatSN:   tc.NextStatSN(),
+			ExpCmdSN: expCmdSN,
+			MaxCmdSN: maxCmdSN,
+		}
+		return tc.SendPDU(resp)
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	sess, err := uiscsi.Dial(ctx, tgt.Addr(),
+		uiscsi.WithPDUHook(rec.Hook()),
+		uiscsi.WithKeepaliveInterval(30*time.Second),
+		uiscsi.WithOperationalOverrides(map[string]string{
+			"ImmediateData": "Yes",
+			"InitialR2T":    "No",
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Dial: %v", err)
+	}
+	t.Cleanup(func() { sess.Close() })
+
+	data := make([]byte, 2048)
+	if err := sess.WriteBlocks(ctx, 0, 0, 4, 512, data); err != nil {
+		t.Fatalf("WriteBlocks: %v", err)
+	}
+
+	// Pitfall 5: Sum immediate data + unsolicited Data-Out.
+	cmds := rec.Sent(pdu.OpSCSICommand)
+	if len(cmds) < 1 {
+		t.Fatalf("captured SCSI commands: got %d, want >= 1", len(cmds))
+	}
+	scsiCmd := cmds[0].Decoded.(*pdu.SCSICommand)
+	immediateLen := scsiCmd.DataSegmentLen
+
+	var unsolicitedLen uint32
+	douts := rec.Sent(pdu.OpDataOut)
+	for _, c := range douts {
+		dout := c.Decoded.(*pdu.DataOut)
+		if dout.TargetTransferTag == 0xFFFFFFFF {
+			unsolicitedLen += dout.DataSegmentLen
+		}
+	}
+
+	totalUnsolicited := immediateLen + unsolicitedLen
+	if totalUnsolicited != 768 {
+		t.Errorf("unsolicited total (immediate %d + Data-Out %d = %d), want 768 (FirstBurstLength)",
+			immediateLen, unsolicitedLen, totalUnsolicited)
+	}
+
+	// Verify unsolicited Data-Out PDUs have TTT=0xFFFFFFFF.
+	for i, c := range douts {
+		dout := c.Decoded.(*pdu.DataOut)
+		if dout.TargetTransferTag == 0xFFFFFFFF {
+			// Good -- unsolicited marker.
+		} else if dout.TargetTransferTag != 0x00000003 {
+			t.Errorf("DataOut[%d].TTT=0x%08X, want 0xFFFFFFFF or 0x00000003", i, dout.TargetTransferTag)
+		}
+	}
+}
+
+// TestDataOut_FBitUnsolicited verifies that only the last unsolicited Data-Out
+// PDU (TTT=0xFFFFFFFF) has the Final bit set.
+// Conformance: DATA-10 (FFP #11.2.1)
+func TestDataOut_FBitUnsolicited(t *testing.T) {
+	rec := &pducapture.Recorder{}
+
+	tgt, err := testutil.NewMockTarget()
+	if err != nil {
+		t.Fatalf("NewMockTarget: %v", err)
+	}
+	t.Cleanup(func() { tgt.Close() })
+
+	// FBL=1024, MaxRecvDSL=256: immediate 256 + 3x256 unsolicited Data-Out = 1024.
+	tgt.SetNegotiationConfig(testutil.NegotiationConfig{
+		ImmediateData:            testutil.BoolPtr(true),
+		InitialR2T:               testutil.BoolPtr(false),
+		FirstBurstLength:         testutil.Uint32Ptr(1024),
+		MaxRecvDataSegmentLength: testutil.Uint32Ptr(256),
+	})
+
+	tgt.HandleLogin()
+	tgt.HandleLogout()
+	tgt.HandleNOPOut()
+	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+
+		// Read unsolicited Data-Out until F-bit.
+		unsolicited, err := testutil.ReadDataOutPDUs(tc)
+		if err != nil {
+			return err
+		}
+		_ = unsolicited
+
+		// Send R2T for remaining data.
+		remaining := cmd.ExpectedDataTransferLength - 1024
+		r2t := &pdu.R2T{
+			Header: pdu.Header{
+				Final:            true,
+				InitiatorTaskTag: cmd.InitiatorTaskTag,
+			},
+			TargetTransferTag:         0x00000004,
+			StatSN:                    tc.StatSN(),
+			ExpCmdSN:                  expCmdSN,
+			MaxCmdSN:                  maxCmdSN,
+			R2TSN:                     0,
+			BufferOffset:              1024,
+			DesiredDataTransferLength: remaining,
+		}
+		if err := tc.SendPDU(r2t); err != nil {
+			return err
+		}
+
+		if _, err := testutil.ReadDataOutPDUs(tc); err != nil {
+			return err
+		}
+
+		resp := &pdu.SCSIResponse{
+			Header: pdu.Header{
+				Final:            true,
+				InitiatorTaskTag: cmd.InitiatorTaskTag,
+			},
+			Status:   0x00,
+			StatSN:   tc.NextStatSN(),
+			ExpCmdSN: expCmdSN,
+			MaxCmdSN: maxCmdSN,
+		}
+		return tc.SendPDU(resp)
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	sess, err := uiscsi.Dial(ctx, tgt.Addr(),
+		uiscsi.WithPDUHook(rec.Hook()),
+		uiscsi.WithKeepaliveInterval(30*time.Second),
+		uiscsi.WithOperationalOverrides(map[string]string{
+			"ImmediateData": "Yes",
+			"InitialR2T":    "No",
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Dial: %v", err)
+	}
+	t.Cleanup(func() { sess.Close() })
+
+	data := make([]byte, 2048)
+	if err := sess.WriteBlocks(ctx, 0, 0, 4, 512, data); err != nil {
+		t.Fatalf("WriteBlocks: %v", err)
+	}
+
+	// Filter unsolicited Data-Out PDUs (TTT=0xFFFFFFFF).
+	douts := rec.Sent(pdu.OpDataOut)
+	var unsolicited []pducapture.CapturedPDU
+	for _, c := range douts {
+		dout := c.Decoded.(*pdu.DataOut)
+		if dout.TargetTransferTag == 0xFFFFFFFF {
+			unsolicited = append(unsolicited, c)
+		}
+	}
+
+	if len(unsolicited) < 2 {
+		t.Fatalf("unsolicited Data-Out PDUs: got %d, want >= 2", len(unsolicited))
+	}
+
+	// All except last should have Final=false; last should have Final=true.
+	for i, c := range unsolicited {
+		dout := c.Decoded.(*pdu.DataOut)
+		expectFinal := i == len(unsolicited)-1
+		if dout.Header.Final != expectFinal {
+			t.Errorf("unsolicited DataOut[%d].Final=%v, want %v", i, dout.Header.Final, expectFinal)
+		}
+	}
+}
