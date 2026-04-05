@@ -165,3 +165,176 @@ func TestRetry_RejectCallerReissue(t *testing.T) {
 	}
 	t.Logf("CDB: identical (both READ(10) for same LBA/block count)")
 }
+
+// TestRetry_ExpStatSNGap tests the initiator's behavior when the target
+// sends a SCSI response with a jumped StatSN, followed by a tail loss
+// scenario where a command receives partial Data-In but never the final
+// response (CMDSEQ-08 / FFP #5.1).
+//
+// Strategy: The first command gets a normal response with StatSN jumped
+// by 5 (creating a gap in ExpStatSN tracking). The second command receives
+// one partial Data-In (no status) to start the SNACK timer, then never
+// receives a final response. The SNACK timer fires after the configured
+// timeout, sending a Status SNACK (Type=1) to request the missing status.
+//
+// The test asserts that a Status SNACK PDU is sent on the wire. If not,
+// it fails explicitly documenting the gap in ERL=1 status recovery.
+func TestRetry_ExpStatSNGap(t *testing.T) {
+	rec := &pducapture.Recorder{}
+
+	tgt, err := testutil.NewMockTarget()
+	if err != nil {
+		t.Fatalf("NewMockTarget: %v", err)
+	}
+	t.Cleanup(func() { tgt.Close() })
+
+	// ERL=1 required for SNACK support.
+	tgt.SetNegotiationConfig(testutil.NegotiationConfig{
+		ErrorRecoveryLevel: testutil.Uint32Ptr(1),
+	})
+	tgt.HandleLogin()
+	tgt.HandleLogout()
+	tgt.HandleNOPOut()
+
+	// Register SNACK handler that consumes all SNACK PDUs silently.
+	// The test verifies SNACK presence via pducapture, not handler logic.
+	tgt.Handle(pdu.OpSNACKReq, func(tc *testutil.TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
+		snack := decoded.(*pdu.SNACKReq)
+		t.Logf("SNACK received: Type=%d, BegRun=%d, RunLength=%d",
+			snack.Type, snack.BegRun, snack.RunLength)
+		return nil
+	})
+
+	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+
+		if callCount == 0 {
+			// First command: advance StatSN by 5 extra calls to create a gap.
+			// The initiator's updateStatSN will jump to the new value.
+			for range 5 {
+				tc.NextStatSN() // skip 5 StatSN values
+			}
+
+			// Send normal response with the jumped StatSN.
+			data := make([]byte, 512)
+			din := &pdu.DataIn{
+				Header: pdu.Header{
+					Final:            true,
+					InitiatorTaskTag: cmd.InitiatorTaskTag,
+					DataSegmentLen:   512,
+				},
+				DataSN:       0,
+				BufferOffset: 0,
+				HasStatus:    true,
+				Status:       0x00,
+				StatSN:       tc.NextStatSN(), // this is now 5 ahead
+				ExpCmdSN:     expCmdSN,
+				MaxCmdSN:     maxCmdSN,
+				Data:         data,
+			}
+			return tc.SendPDU(din)
+		}
+
+		if callCount == 1 {
+			// Second command: send one partial Data-In (no status) to start
+			// the SNACK timer, then do NOT respond further. This creates a
+			// tail loss scenario where the SNACK timer fires.
+			partialData := make([]byte, 256)
+			din := &pdu.DataIn{
+				Header: pdu.Header{
+					InitiatorTaskTag: cmd.InitiatorTaskTag,
+					DataSegmentLen:   256,
+				},
+				DataSN:       0,
+				BufferOffset: 0,
+				ExpCmdSN:     expCmdSN,
+				MaxCmdSN:     maxCmdSN,
+				Data:         partialData,
+			}
+			// Send partial Data-In, then return without sending final.
+			// The SNACK timer will fire after snackTimeout.
+			return tc.SendPDU(din)
+		}
+
+		// callCount >= 2: respond normally (cleanup).
+		data := make([]byte, 512)
+		din := &pdu.DataIn{
+			Header: pdu.Header{
+				Final:            true,
+				InitiatorTaskTag: cmd.InitiatorTaskTag,
+				DataSegmentLen:   512,
+			},
+			DataSN:       0,
+			BufferOffset: 0,
+			HasStatus:    true,
+			Status:       0x00,
+			StatSN:       tc.NextStatSN(),
+			ExpCmdSN:     expCmdSN,
+			MaxCmdSN:     maxCmdSN,
+			Data:         data,
+		}
+		return tc.SendPDU(din)
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	sess, err := uiscsi.Dial(ctx, tgt.Addr(),
+		uiscsi.WithPDUHook(rec.Hook()),
+		uiscsi.WithKeepaliveInterval(30*time.Second),
+		uiscsi.WithSNACKTimeout(500*time.Millisecond), // short timeout for test speed
+		uiscsi.WithOperationalOverrides(map[string]string{
+			"ErrorRecoveryLevel": "1",
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Dial: %v", err)
+	}
+	t.Cleanup(func() { sess.Close() })
+
+	// First ReadBlocks: should succeed despite jumped StatSN.
+	data, err := sess.ReadBlocks(ctx, 0, 0, 1, 512)
+	if err != nil {
+		t.Fatalf("first ReadBlocks: %v", err)
+	}
+	if len(data) != 512 {
+		t.Fatalf("first ReadBlocks returned %d bytes, want 512", len(data))
+	}
+	t.Log("first ReadBlocks succeeded (StatSN jumped by 5)")
+
+	// Second ReadBlocks in a goroutine with short timeout. This will hang
+	// (only partial Data-In, no final response), triggering the SNACK timer.
+	readCtx, readCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer readCancel()
+
+	doneCh := make(chan error, 1)
+	go func() {
+		_, err := sess.ReadBlocks(readCtx, 0, 0, 1, 512)
+		doneCh <- err
+	}()
+
+	// Wait for the SNACK timer to fire. With 500ms timeout, wait up to 3s.
+	time.Sleep(2 * time.Second)
+
+	// Check pducapture for Status SNACK PDUs.
+	snacks := rec.Sent(pdu.OpSNACKReq)
+	var statusSNACKFound bool
+	for _, s := range snacks {
+		snack := s.Decoded.(*pdu.SNACKReq)
+		if snack.Type == 1 { // Status SNACK
+			statusSNACKFound = true
+			t.Logf("Status SNACK found: Type=%d, BegRun=%d, RunLength=%d, ExpStatSN=%d",
+				snack.Type, snack.BegRun, snack.RunLength, snack.ExpStatSN)
+			break
+		}
+	}
+
+	if !statusSNACKFound {
+		t.Fatal("CMDSEQ-08: no Status SNACK sent after StatSN gap -- " +
+			"ERL=1 status recovery via SNACK timer is not functioning for tail loss scenario")
+	}
+
+	// Clean up: cancel the second ReadBlocks.
+	readCancel()
+	<-doneCh
+}

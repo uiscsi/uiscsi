@@ -150,3 +150,13 @@ func WithReconnectBackoff(base time.Duration) Option {
 		c.sessionOpts = append(c.sessionOpts, session.WithReconnectBackoff(base))
 	}
 }
+
+// WithSNACKTimeout sets the timeout for SNACK-based PDU retransmission
+// at ERL >= 1. When no Data-In arrives within this duration, a Status
+// SNACK is sent to request the missing response (tail loss recovery).
+// Default is 5 seconds.
+func WithSNACKTimeout(d time.Duration) Option {
+	return func(c *dialConfig) {
+		c.sessionOpts = append(c.sessionOpts, session.WithSNACKTimeout(d))
+	}
+}

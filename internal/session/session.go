@@ -149,6 +149,7 @@ func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error
 	tk.erl = uint32(s.params.ErrorRecoveryLevel)
 	tk.getWriteCh = s.getWriteCh
 	tk.expStatSNFunc = s.getExpStatSN
+	tk.snackTimeout = s.cfg.snackTimeout
 
 	s.mu.Lock()
 	s.tasks[itt] = tk
