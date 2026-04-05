@@ -2,7 +2,7 @@
 
 A pure-userspace iSCSI initiator library for Go.
 
-**Status:** v1.0 -- all core iSCSI operations implemented and tested against real LIO kernel targets.
+**Status:** v1.1 -- full RFC 7143 compliance with 86 wire-level conformance tests and 20 E2E tests against real LIO kernel targets.
 
 ## Overview
 
@@ -120,8 +120,10 @@ Key types and functions:
 The library includes three test tiers:
 
 - **Unit tests** -- table-driven tests for PDU codec, serial arithmetic, sense parsing (`go test ./...`)
-- **Conformance tests** -- 22 tests against an in-process mock iSCSI target (`test/conformance/`)
-- **E2E tests** -- 19 tests against a real Linux LIO kernel target via configfs (`sudo go test -tags e2e ./test/e2e/`)
+- **Conformance tests** -- 86 wire-level tests against an in-process mock iSCSI target with PDU capture (`test/conformance/`). Covers 84% of the UNH-IOL Initiator Full Feature Phase test suite (see `doc/test_matrix_initiator_ffp.md`).
+- **E2E tests** -- 20 tests against a real Linux LIO kernel target via configfs (`sudo go test -tags e2e ./test/e2e/`)
+
+Conformance test areas: CmdSN sequencing, command window enforcement, Data-In/Out PDU fields, R2T fulfillment, SCSI command modes, SNACK recovery, error injection, NOP-Out/In, session lifecycle, async messages, ERL 2 connection replacement, TMF wire fields, Abort Task Set behavior, and Text Request negotiation.
 
 ## Requirements
 
