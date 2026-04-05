@@ -11,6 +11,7 @@ import (
 	"log"
 	"log/slog"
 	"net"
+	"strconv"
 	"sync"
 	"sync/atomic"
 
@@ -62,6 +63,21 @@ func (tc *TargetConn) Close() error {
 	return tc.nc.Close()
 }
 
+// ReadPDU reads the next PDU from the initiator. Used by HandleSCSIFunc handlers
+// to receive Data-Out PDUs inline during write sequences.
+func (tc *TargetConn) ReadPDU() (pdu.PDU, *transport.RawPDU, error) {
+	raw, err := transport.ReadRawPDU(tc.nc, false, false, 0)
+	if err != nil {
+		return nil, nil, err
+	}
+	decoded, err := pdu.DecodeBHS(raw.BHS)
+	if err != nil {
+		return nil, raw, err
+	}
+	attachDataSegment(decoded, raw.DataSegment)
+	return decoded, raw, nil
+}
+
 // SessionState tracks target-side command sequencing state.
 // Handlers call Update() to get correct ExpCmdSN/MaxCmdSN for responses
 // instead of hardcoding cmd.CmdSN+1/cmd.CmdSN+10.
@@ -109,6 +125,23 @@ func (ss *SessionState) ExpCmdSN() uint32 {
 	return ss.expCmdSN
 }
 
+// NegotiationConfig controls what the target offers during login negotiation.
+// Nil pointer fields mean "echo the initiator's proposal" (existing behavior).
+type NegotiationConfig struct {
+	ImmediateData            *bool
+	InitialR2T               *bool
+	FirstBurstLength         *uint32
+	MaxBurstLength           *uint32
+	MaxRecvDataSegmentLength *uint32
+	ErrorRecoveryLevel       *uint32
+}
+
+// BoolPtr returns a pointer to the given bool value. Used in NegotiationConfig.
+func BoolPtr(v bool) *bool { return &v }
+
+// Uint32Ptr returns a pointer to the given uint32 value. Used in NegotiationConfig.
+func Uint32Ptr(v uint32) *uint32 { return &v }
+
 // MockTarget is an in-process iSCSI target for testing.
 // It listens on a local TCP port, accepts connections, and dispatches
 // received PDUs to registered handlers by opcode.
@@ -120,8 +153,9 @@ type MockTarget struct {
 	done     chan struct{}
 	wg       sync.WaitGroup
 	closed   atomic.Bool
-	strict   bool // if true, unhandled opcodes close the connection
-	session  *SessionState
+	strict            bool // if true, unhandled opcodes close the connection
+	session           *SessionState
+	negotiationConfig NegotiationConfig
 }
 
 // SetStrictMode configures whether unhandled opcodes cause connection errors.
@@ -170,6 +204,14 @@ func (mt *MockTarget) Handle(opcode pdu.OpCode, h PDUHandler) {
 // window behavior in tests.
 func (mt *MockTarget) Session() *SessionState {
 	return mt.session
+}
+
+// SetNegotiationConfig configures the negotiation parameters the target
+// will offer during login. Non-nil fields override the default echo behavior.
+func (mt *MockTarget) SetNegotiationConfig(cfg NegotiationConfig) {
+	mt.mu.Lock()
+	defer mt.mu.Unlock()
+	mt.negotiationConfig = cfg
 }
 
 // HandleSCSIFunc registers a flexible SCSI command handler where the test
@@ -387,15 +429,54 @@ func (mt *MockTarget) HandleLogin() {
 			return tc.SendPDU(resp)
 
 		case 1: // Operational Negotiation
-			// Echo back operational parameters with target values.
+			// Echo back operational parameters with target values,
+			// respecting NegotiationConfig overrides where set.
+			mt.mu.Lock()
+			negCfg := mt.negotiationConfig
+			mt.mu.Unlock()
+
 			var respKVs []login.KeyValue
 			for _, kv := range kvs {
 				switch kv.Key {
 				case "HeaderDigest", "DataDigest":
 					respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: "None"})
+				case "ImmediateData":
+					if negCfg.ImmediateData != nil {
+						respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: strconv.FormatBool(*negCfg.ImmediateData)})
+					} else {
+						respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: kv.Value})
+					}
+				case "InitialR2T":
+					if negCfg.InitialR2T != nil {
+						respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: strconv.FormatBool(*negCfg.InitialR2T)})
+					} else {
+						respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: kv.Value})
+					}
+				case "FirstBurstLength":
+					if negCfg.FirstBurstLength != nil {
+						respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: strconv.FormatUint(uint64(*negCfg.FirstBurstLength), 10)})
+					} else {
+						respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: kv.Value})
+					}
+				case "MaxBurstLength":
+					if negCfg.MaxBurstLength != nil {
+						respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: strconv.FormatUint(uint64(*negCfg.MaxBurstLength), 10)})
+					} else {
+						respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: kv.Value})
+					}
 				case "MaxRecvDataSegmentLength":
-					// Declarative: target declares its own value.
-					respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: "8192"})
+					if negCfg.MaxRecvDataSegmentLength != nil {
+						respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: strconv.FormatUint(uint64(*negCfg.MaxRecvDataSegmentLength), 10)})
+					} else {
+						// Declarative: target declares its own value.
+						respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: "8192"})
+					}
+				case "ErrorRecoveryLevel":
+					if negCfg.ErrorRecoveryLevel != nil {
+						respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: strconv.FormatUint(uint64(*negCfg.ErrorRecoveryLevel), 10)})
+					} else {
+						respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: kv.Value})
+					}
 				default:
 					// Echo back the proposed value (accept everything).
 					respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: kv.Value})
