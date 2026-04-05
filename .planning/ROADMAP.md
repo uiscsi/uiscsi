@@ -39,7 +39,7 @@ See [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md) for full phase deta
 - **PDU capture hook:** `WithPDUHook` captures every PDU sent/received — works with both MockTarget and LIO.
 
 - [x] **Phase 13: PDU Wire Capture Framework and Command Sequencing** - Test infrastructure for PDU-level assertions plus basic CmdSN wire validation (completed 2026-04-04)
-- [ ] **Phase 14: Data Transfer and R2T Wire Validation** - Data-Out/Data-In field assertions and R2T fulfillment verification on the wire
+- [x] **Phase 14: Data Transfer and R2T Wire Validation** - Data-Out/Data-In field assertions and R2T fulfillment verification on the wire (completed 2026-04-05)
 - [ ] **Phase 15: SCSI Command Write Mode Wire Tests** - ImmediateData/InitialR2T/FirstBurstLength matrix with PDU-level verification
 - [ ] **Phase 16: Error Injection and SCSI Error Handling** - MockTarget error injection for status codes, sense data, SNACK reject, and DataSN gaps
 - [ ] **Phase 17: Session Management, NOP-Out, and Async Messages** - Async message injection, NOP-Out variants, and logout wire validation
@@ -75,10 +75,10 @@ Plans:
   5. Tests verify R2T fulfillment with correct single-PDU and multi-PDU responses, including out-of-order and parallel command scenarios
 **Plans**: 4 plans
 Plans:
-- [ ] 14-01-PLAN.md — MockTarget extensions (NegotiationConfig, ReadPDU, HandleSCSIReadMultiPDU, R2T helpers)
-- [ ] 14-02-PLAN.md — Data-Out wire conformance tests (DATA-01,02,03,04,05,08,10,11,12,13)
-- [ ] 14-03-PLAN.md — Data-In wire conformance tests (DATA-06,07,09,14)
-- [ ] 14-04-PLAN.md — R2T fulfillment conformance tests (R2T-01,02,03,04)
+- [x] 14-01-PLAN.md — MockTarget extensions (NegotiationConfig, ReadPDU, HandleSCSIReadMultiPDU, R2T helpers)
+- [x] 14-02-PLAN.md — Data-Out wire conformance tests (DATA-01,02,03,04,05,08,10,11,12,13)
+- [x] 14-03-PLAN.md — Data-In wire conformance tests (DATA-06,07,09,14)
+- [x] 14-04-PLAN.md — R2T fulfillment conformance tests (R2T-01,02,03,04)
 
 ### Phase 15: SCSI Command Write Mode Wire Tests
 **Goal**: SCSI Command PDU fields are verified at the wire level across all ImmediateData/InitialR2T/FirstBurstLength combinations
@@ -155,7 +155,7 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16 -> 17 -> 18 -> 19
 | 10. E2E Coverage Expansion | v1.0 | 5/5 | Complete | 2026-04-03 |
 | 11. Audit Remediation | v1.0 | 4/4 | Complete | 2026-04-03 |
 | 13. PDU Wire Capture + CmdSN | v1.1 | 2/2 | Complete    | 2026-04-04 |
-| 14. Data Transfer + R2T | v1.1 | 0/4 | Planned | - |
+| 14. Data Transfer + R2T | v1.1 | 4/4 | Complete    | 2026-04-05 |
 | 15. SCSI Write Mode | v1.1 | 0/0 | Not started | - |
 | 16. Error Injection + SNACK | v1.1 | 0/0 | Not started | - |
 | 17. Session Mgmt + Async | v1.1 | 0/0 | Not started | - |
