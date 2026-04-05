@@ -120,7 +120,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [x] 17-01-PLAN.md — MockTarget SendAsyncMsg/HandleText + production code fixes + NOP-Out ping tests (SESS-03, SESS-04)
-- [ ] 17-02-PLAN.md — ExpStatSN confirmation test (SESS-05) + session lifecycle tests (SESS-01, SESS-06)
+- [x] 17-02-PLAN.md — ExpStatSN confirmation test (SESS-05) + session lifecycle tests (SESS-01, SESS-06)
 - [ ] 17-03-PLAN.md — Async message conformance tests (ASYNC-01, ASYNC-02, ASYNC-03, ASYNC-04)
 
 ### Phase 18: Command Window, Retry, and ERL 2
@@ -168,6 +168,6 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16 -> 17 -> 18 -> 19
 | 14. Data Transfer + R2T | v1.1 | 4/4 | Complete    | 2026-04-05 |
 | 15. SCSI Write Mode | v1.1 | 2/2 | Complete    | 2026-04-05 |
 | 16. Error Injection + SNACK | v1.1 | 2/2 | Complete   | 2026-04-05 |
-| 17. Session Mgmt + Async | v1.1 | 1/3 | In Progress|  |
+| 17. Session Mgmt + Async | v1.1 | 2/3 | In Progress|  |
 | 18. Cmd Window + ERL 2 | v1.1 | 0/0 | Not started | - |
 | 19. TMF + Text | v1.1 | 0/0 | Not started | - |
