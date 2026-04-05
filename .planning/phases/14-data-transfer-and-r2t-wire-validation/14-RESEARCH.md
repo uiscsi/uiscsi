@@ -331,7 +331,7 @@ tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, n int) er
 | DATA-14 | EDTL matches actual transfer | E2E conformance | `go test ./test/conformance/ -run TestDataIn_EDTL -count=1` | Wave 0 |
 | R2T-01 | Single PDU R2T response | E2E conformance | `go test ./test/conformance/ -run TestR2T_SinglePDU -count=1` | Wave 0 |
 | R2T-02 | Multi-PDU R2T response | E2E conformance | `go test ./test/conformance/ -run TestR2T_MultiPDU -count=1` | Wave 0 |
-| R2T-03 | Out-of-order R2T fulfillment | E2E conformance | `go test ./test/conformance/ -run TestR2T_OutOfOrder -count=1` | Wave 0 |
+| R2T-03 | Out-of-order R2T fulfillment | E2E conformance | `go test ./test/conformance/ -run TestR2T_MultipleR2T -count=1` | Wave 0 |
 | R2T-04 | Parallel command R2T | E2E conformance | `go test ./test/conformance/ -run TestR2T_ParallelCommand -count=1` | Wave 0 |
 
 ### Sampling Rate
@@ -367,17 +367,19 @@ No new dependencies. All work uses existing stdlib + project codebase:
 
 **A2 risk assessment:** The MockTarget `serveConn` loop (target.go line 238) reads PDUs sequentially and dispatches to the handler. Since Data-Out PDUs arrive on the same connection after the SCSI Command, the handler can perform additional reads from `tc.nc` to consume Data-Out PDUs inline. This is confirmed by the existing unit test pattern in `internal/session/dataout_test.go` which uses `readDataOutPDU(t, targetConn)` to read Data-Out from the net.Pipe. However, in MockTarget the serveConn loop owns the read side, so the handler must NOT return until all Data-Out PDUs are consumed -- otherwise serveConn will try to decode Data-Out as a new PDU dispatch. This means write-path handlers in HandleSCSIFunc must be **blocking** until the write sequence completes. [VERIFIED: test/target.go serveConn lines 238-276]
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **A-bit DataACK code path in initiator**
    - What we know: `snack.go` has SNACKTypeDataACK=2, `datain.go` handleDataIn resets SNACK timer on each Data-In at ERL>=1, gap detection sends SNACKTypeDataR2T
    - What's unclear: Whether the initiator currently sends DataACK SNACK when it sees A-bit=true on a received Data-In. The handleDataIn code checks for DataSN gaps but does not appear to check `din.Acknowledge` (A-bit). This may need implementation, not just testing.
    - Recommendation: During plan execution, verify if `handleDataIn` responds to A-bit. If not, add DataACK SNACK send when A-bit is seen. This is implementation work within the test phase, but it is small and clearly scoped to DATA-07.
+   - RESOLVED: Plan 14-03, Task 1 addresses this. The task action includes a pre-check of datain.go for the A-bit code path and adds it if missing (5-10 lines in handleDataIn). internal/session/datain.go is listed in 14-03 files_modified.
 
 2. **TargetConn.nc access for inline Data-Out reads**
    - What we know: `TargetConn.nc` is the private `net.Conn` field
    - What's unclear: Whether HandleSCSIFunc handlers can access `tc.nc` directly to read Data-Out PDUs inline, or if a helper method is needed
    - Recommendation: Add `TargetConn.ReadPDU()` method that wraps `transport.ReadRawPDU` with the connection, or expose a public accessor. Simpler than exposing nc directly.
+   - RESOLVED: Plan 14-01, Task 1 adds `TargetConn.ReadPDU()` method wrapping `transport.ReadRawPDU`. Plan 14-01, Task 2 adds `ReadDataOutPDUs()` helper that uses ReadPDU to collect Data-Out PDUs until F-bit.
 
 ## Sources
 
