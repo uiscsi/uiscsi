@@ -2,6 +2,7 @@ package conformance_test
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -220,11 +221,11 @@ func TestERL2_TaskReassign(t *testing.T) {
 	// HandleSCSIFunc:
 	// callCount==0: record the original ITT, then close connection.
 	// callCount>=1: respond normally.
-	var originalITT uint32
+	var originalITT atomic.Uint32
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
 		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
 		if callCount == 0 {
-			originalITT = cmd.InitiatorTaskTag
+			originalITT.Store(cmd.InitiatorTaskTag)
 			tc.Close()
 			return nil
 		}
@@ -294,9 +295,9 @@ func TestERL2_TaskReassign(t *testing.T) {
 	}
 
 	// Verify ReferencedTaskTag matches the original SCSI Command ITT.
-	if tmfRefTag != originalITT {
+	if tmfRefTag != originalITT.Load() {
 		t.Fatalf("SESS-08: TMF ReferencedTaskTag=0x%08X, want original ITT=0x%08X",
-			tmfRefTag, originalITT)
+			tmfRefTag, originalITT.Load())
 	}
 
 	// Also verify via pducapture: at least one sent TMF has Function=14.
@@ -307,9 +308,9 @@ func TestERL2_TaskReassign(t *testing.T) {
 		if ok && tmf.Function == 14 {
 			foundInCapture = true
 			// Cross-check ReferencedTaskTag from pducapture.
-			if tmf.ReferencedTaskTag != originalITT {
+			if tmf.ReferencedTaskTag != originalITT.Load() {
 				t.Fatalf("SESS-08: pducapture TMF ReferencedTaskTag=0x%08X, want 0x%08X",
-					tmf.ReferencedTaskTag, originalITT)
+					tmf.ReferencedTaskTag, originalITT.Load())
 			}
 			break
 		}

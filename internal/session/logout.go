@@ -49,7 +49,11 @@ func (s *Session) logout(ctx context.Context, reasonCode uint8) error {
 
 	// Wait for LogoutResp with timeout.
 	// Use DefaultTime2Wait + DefaultTime2Retain as max, capped at 30s.
-	timeout := time.Duration(s.params.DefaultTime2Wait+s.params.DefaultTime2Retain) * time.Second
+	// Read params under lock — reconnect() may replace s.params concurrently.
+	s.mu.Lock()
+	t2w, t2r := s.params.DefaultTime2Wait, s.params.DefaultTime2Retain
+	s.mu.Unlock()
+	timeout := time.Duration(t2w+t2r) * time.Second
 	if timeout <= 0 || timeout > 30*time.Second {
 		timeout = 30 * time.Second
 	}

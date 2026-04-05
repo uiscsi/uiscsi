@@ -268,7 +268,13 @@ func (s *Session) Close() error {
 			cancel()
 		}
 
-		s.window.close()
+		// Snapshot window under lock — reconnect() may replace s.window
+		// concurrently. We close the snapshotted window to unblock any
+		// goroutines waiting on acquire.
+		s.mu.Lock()
+		win := s.window
+		s.mu.Unlock()
+		win.close()
 		s.cancel()
 
 		// Cancel all in-flight tasks and capture conn under lock
