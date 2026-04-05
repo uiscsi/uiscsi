@@ -12,9 +12,10 @@ import (
 	"github.com/rkujawa/uiscsi/internal/transport"
 )
 
-// triggerReconnect starts an ERL 0 reconnect in a background goroutine.
-// It is safe to call from multiple goroutines; only the first call starts
-// the reconnect, subsequent calls are no-ops while recovery is in progress.
+// triggerReconnect starts a reconnect in a background goroutine, dispatching
+// to replaceConnection (ERL >= 2) or reconnect (ERL 0) based on the
+// negotiated ErrorRecoveryLevel. It is safe to call from multiple goroutines;
+// only the first call starts recovery, subsequent calls are no-ops.
 func (s *Session) triggerReconnect(cause error) {
 	s.mu.Lock()
 	if s.recovering {
@@ -22,11 +23,22 @@ func (s *Session) triggerReconnect(cause error) {
 		return // Already recovering
 	}
 	s.recovering = true
+	erl := s.params.ErrorRecoveryLevel
 	s.mu.Unlock()
 	s.cfg.logger.Info("session: reconnect started",
 		"target", s.targetAddr,
-		"cause", cause.Error())
-	go s.reconnect(cause)
+		"cause", cause.Error(),
+		"erl", erl)
+	if erl >= 2 {
+		go func() {
+			if err := s.replaceConnection(cause); err != nil {
+				s.cfg.logger.Error("session: ERL 2 connection replacement failed, falling back to ERL 0", "err", err)
+				s.reconnect(cause)
+			}
+		}()
+	} else {
+		go s.reconnect(cause)
+	}
 }
 
 // reconnect implements ERL 0 (Error Recovery Level 0) session reinstatement.
