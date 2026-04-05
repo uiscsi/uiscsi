@@ -145,7 +145,10 @@ func (s *Session) reconnect(cause error) {
 	}
 
 	if newConn == nil {
-		// All attempts exhausted.
+		// All attempts exhausted (or maxReconnectAttempts == 0).
+		if lastErr == nil {
+			lastErr = cause
+		}
 		s.cfg.logger.Warn("session: reconnect failed",
 			"attempts", s.cfg.maxReconnectAttempts,
 			"error", lastErr.Error())
