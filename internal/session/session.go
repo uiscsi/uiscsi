@@ -145,6 +145,11 @@ func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error
 	tk.lun = cmd.LUN // Store LUN for TMF LUN-based cleanup
 	tk.cmd = cmd      // Store for retry during ERL 0 recovery
 
+	// Populate ERL fields for SNACK handling (DataSN gap detection, A-bit DataACK).
+	tk.erl = uint32(s.params.ErrorRecoveryLevel)
+	tk.getWriteCh = s.getWriteCh
+	tk.expStatSNFunc = s.getExpStatSN
+
 	s.mu.Lock()
 	s.tasks[itt] = tk
 	expStatSN := s.expStatSN

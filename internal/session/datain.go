@@ -99,6 +99,31 @@ func (t *task) handleDataIn(din *pdu.DataIn) {
 	t.nextDataSN++
 	t.nextOffset += uint32(len(din.Data))
 
+	// A-bit: target requests DataACK acknowledgement (RFC 7143 Section 11.7.2).
+	// Send a SNACK with Type=DataACK (2) at ERL >= 1, BegRun = next expected DataSN.
+	if din.Acknowledge && t.erl >= 1 && t.getWriteCh != nil {
+		expStatSN := t.expStatSNFunc()
+		snack := &pdu.SNACKReq{
+			Header: pdu.Header{
+				Final:            true,
+				InitiatorTaskTag: t.itt,
+			},
+			Type:              SNACKTypeDataACK,
+			TargetTransferTag: din.TargetTransferTag,
+			BegRun:            t.nextDataSN, // acknowledge up to (but not including) this DataSN
+			ExpStatSN:         expStatSN,
+		}
+		bhs, err := snack.MarshalBHS()
+		if err == nil {
+			raw := &transport.RawPDU{BHS: bhs}
+			writeCh := t.getWriteCh()
+			select {
+			case writeCh <- raw:
+			default:
+			}
+		}
+	}
+
 	// After processing in-order PDU, drain any buffered out-of-order PDUs.
 	if t.snack != nil && len(t.snack.pendingDataIn) > 0 {
 		t.drainPendingDataIn()
