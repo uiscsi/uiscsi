@@ -35,6 +35,17 @@ func newCmdWindow(cmdSN, expCmdSN, maxCmdSN uint32) *cmdWindow {
 	return w
 }
 
+// windowOpen reports whether the command window is open. Per RFC 7143
+// Section 3.2.2.1, the window is open when MaxCmdSN >= ExpCmdSN (serial)
+// AND CmdSN is within [ExpCmdSN, MaxCmdSN]. When MaxCmdSN < ExpCmdSN
+// (serial), the command window is closed (zero window) regardless of CmdSN.
+func (w *cmdWindow) windowOpen() bool {
+	if serial.LessThan(w.maxCmdSN, w.expCmdSN) {
+		return false // zero window: MaxCmdSN < ExpCmdSN
+	}
+	return serial.InWindow(w.cmdSN, w.expCmdSN, w.maxCmdSN)
+}
+
 // acquire blocks until a CmdSN slot is available within the window, then
 // returns the allocated CmdSN and increments the internal counter.
 // Returns an error if the window is closed or the context is cancelled.
@@ -46,7 +57,7 @@ func (w *cmdWindow) acquire(ctx context.Context) (uint32, error) {
 		w.mu.Unlock()
 		return 0, errWindowClosed
 	}
-	if serial.InWindow(w.cmdSN, w.expCmdSN, w.maxCmdSN) {
+	if w.windowOpen() {
 		sn := w.cmdSN
 		w.cmdSN = serial.Incr(w.cmdSN)
 		w.mu.Unlock()
@@ -62,7 +73,7 @@ func (w *cmdWindow) acquire(ctx context.Context) (uint32, error) {
 
 	go func() {
 		// We already hold the lock from the caller above.
-		for !w.closed && !serial.InWindow(w.cmdSN, w.expCmdSN, w.maxCmdSN) {
+		for !w.closed && !w.windowOpen() {
 			w.cond.Wait()
 		}
 		if w.closed {
@@ -94,6 +105,10 @@ func (w *cmdWindow) acquire(ctx context.Context) (uint32, error) {
 // update advances the ExpCmdSN and MaxCmdSN from a target response PDU.
 // Per RFC 7143 Section 3.2.2.1: if MaxCmdSN < ExpCmdSN-1 (in serial
 // arithmetic), both values MUST be ignored (stale/invalid update).
+//
+// MaxCmdSN may decrease relative to the current value -- this is how the
+// target closes the command window (flow control). The only constraint is
+// the validity check above. ExpCmdSN must not go backwards (monotonic).
 func (w *cmdWindow) update(expCmdSN, maxCmdSN uint32) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -105,17 +120,18 @@ func (w *cmdWindow) update(expCmdSN, maxCmdSN uint32) {
 	}
 
 	updated := false
-	if serial.GreaterThan(expCmdSN, w.expCmdSN) || expCmdSN == w.expCmdSN {
-		if expCmdSN != w.expCmdSN {
-			w.expCmdSN = expCmdSN
-			updated = true
-		}
+
+	// ExpCmdSN is monotonically non-decreasing.
+	if serial.GreaterThan(expCmdSN, w.expCmdSN) {
+		w.expCmdSN = expCmdSN
+		updated = true
 	}
-	if serial.GreaterThan(maxCmdSN, w.maxCmdSN) || maxCmdSN == w.maxCmdSN {
-		if maxCmdSN != w.maxCmdSN {
-			w.maxCmdSN = maxCmdSN
-			updated = true
-		}
+
+	// MaxCmdSN may increase or decrease (target flow control).
+	// Accept any valid MaxCmdSN that differs from current.
+	if maxCmdSN != w.maxCmdSN {
+		w.maxCmdSN = maxCmdSN
+		updated = true
 	}
 
 	if updated {
