@@ -48,7 +48,7 @@ Full RFC 7143 compliance as a composable Go library — the spec is non-negotiab
 - Kernel integration / block device emulation — defeats the purpose of pure userspace
 - Boot from iSCSI — requires kernel involvement by nature
 
-## Current Milestone: v1.1.0 Full Test Compliance and Coverage
+## Shipped Milestone: v1.1.0 Full Test Compliance and Coverage (2026-04-05)
 
 **Goal:** Achieve full UNH-IOL Initiator FFP test suite coverage — promote all 62 tests from partial/not-covered to covered with wire-level E2E validation.
 
@@ -61,15 +61,15 @@ Full RFC 7143 compliance as a composable Go library — the spec is non-negotiab
 - Command window E2E tests: zero window, large window, window-of-1
 - Remaining FFP tests: immediate delivery, command retry, ExpStatSN gap, zero-length Data-In, R2T ordering, NOP-Out variants
 
-## Current State (Phase 18 complete, 2026-04-05)
+## Current State (v1.1.0 shipped, 2026-04-05)
 
-- **26,060 lines of Go** across 10 packages, zero external runtime dependencies
-- **98 requirements** verified (81 core + 17 audit remediation), plus 11 v1.1.0 (CMDSEQ-01 through CMDSEQ-09, SESS-07, SESS-08)
-- **19 E2E tests** against real Linux LIO kernel target
-- **33 conformance tests** against in-process mock target (phases 13-18: wire-level PDU capture tests)
+- **34,881 lines of Go** across 10 packages, zero external runtime dependencies
+- **86 conformance tests** against in-process mock target with wire-level PDU capture (84% UNH-IOL FFP coverage)
+- **20 E2E tests** against real Linux LIO kernel target (all pass with -race)
+- **66 v1.1.0 requirements** verified (CMDSEQ, DATA, R2T, SCSI, SNACK, ERR, SESS, ASYNC, TMF, TEXT)
 - **CLI tool:** `uiscsi-ls` for lsscsi-style discovery
-- **18 phases** completed
-- **Phase 18 complete:** Command window enforcement (zero/large/1), same-connection retry with original ITT/CDB/CmdSN (RFC 7143 §6.2.1), ExpStatSN gap + SNACK recovery, ERL 2 connection reassignment + task reassign. Production bugs fixed: cmdwindow zero-window detection, MaxCmdSN monotonic guard, SNACK timeout wiring
+- **19 phases** completed across 2 milestones (v1.0 + v1.1.0), 115 commits in v1.1.0
+- **v1.1.0 complete:** Wire-level conformance testing for all FFP groups — CmdSN sequencing, Data-In/Out fields, R2T fulfillment, SCSI command modes, SNACK recovery, error injection, NOP-Out/In, session lifecycle, async messages, ERL 2 connection replacement, TMF fields, Abort Task Set, Text Request negotiation. Production bugs found and fixed: cmdwindow zero-window detection, MaxCmdSN monotonic guard, SNACK timeout wiring, Close/reconnect race conditions, renegotiate params race
 
 ## Context
 

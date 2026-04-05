@@ -1,5 +1,32 @@
 # Milestones
 
+## v1.1.0 Full Test Compliance and Coverage (Shipped: 2026-04-05)
+
+**Phases completed:** 7 phases, 19 plans, 34 tasks
+
+**Key accomplishments:**
+
+- PDU capture Recorder with typed decode via DecodeBHS, MockTarget HandleSCSIFunc with atomic call counter, and SessionState for stateful CmdSN/MaxCmdSN tracking
+- Three wire-level CmdSN conformance tests proving sequential increment for SCSI commands and Immediate delivery (no CmdSN advance) for NOP-Out and TMF
+- MockTarget extended with NegotiationConfig, multi-PDU Data-In, R2T sequence generation, and Data-Out receive for Phase 14 conformance tests
+- Commit:
+- 4 R2T wire conformance tests validating TTT echo, DataSN progression, per-burst reset, F-bit placement, and per-command ITT/TTT isolation
+- Extracted 5 reusable write-test helpers into helpers_test.go to eliminate setup boilerplate for SCSI command wire conformance tests
+- All 7 SCSI Command PDU wire conformance tests (SCSI-01 through SCSI-07) covering ImmediateData/InitialR2T/FirstBurstLength matrix with W-bit, F-bit, EDTL, and DataSegmentLength assertions
+- HandleSCSIWithStatus helper and 6 ERR conformance tests covering BUSY, RESERVATION CONFLICT, CHECK CONDITION sense parsing, and SNACK Reject task cancellation with retry
+- Data/R2T SNACK on DataSN gap (Type=0, BegRun=1, RunLength=1) and DataACK SNACK on A-bit (Type=2, BegRun=2, RunLength=0, TTT=0x00000042) verified at wire level
+- MockTarget async injection with SendAsyncMsg/HandleText, LUN echo fix, Parameter3 deadline, renegotiation handler, plus SESS-03/SESS-04 NOP-Out wire field conformance tests
+- SESS-05 ExpStatSN NOP-Out confirmation, SESS-01 async logout within Parameter3, and SESS-06 clean logout exchange -- all validated on wire via PDU capture
+- Four async event conformance tests (ASYNC-01 through ASYNC-04) validating logout timing, connection drop, session drop, and TextReq renegotiation with wire-level PDU assertions
+- 4 command window conformance tests (zero/large/size-1/MaxCmdSN close) with cmdWindow bug fixes for RFC 7143 flow control compliance
+- Reject-reissue and SNACK timer tail loss conformance tests proving ERL=1 command retry and status recovery behavior
+- ERL dispatch in triggerReconnect with conformance tests proving Logout(reasonCode=2) and TMF TASK REASSIGN(Function=14) on wire after ERL 2 connection replacement
+- Same-connection retry on Reject at ERL>=1 using original ITT, CDB, CmdSN per RFC 7143 Section 6.2.1
+- 6 TMF wire-level conformance tests verifying CmdSN immediate handling, LUN encoding, RefCmdSN, and AbortTaskSet behavior with non-blocking goroutine stall pattern
+- 6 Text Request conformance tests validating opcode, F-bit, ITT uniqueness, TTT handling (initial and continuation), CmdSN/ExpStatSN, and negotiation reset per RFC 7143
+
+---
+
 ## v1.0 v1.0 (Shipped: 2026-04-03)
 
 **Phases completed:** 12 phases, 38 plans, 77 tasks
