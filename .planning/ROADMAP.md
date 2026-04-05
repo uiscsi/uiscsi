@@ -132,7 +132,11 @@ Plans:
   2. Tests verify command retry carries original ITT, CDB, and CmdSN on the wire
   3. Tests verify ExpStatSN gap detection triggers recovery and MaxCmdSN in SCSI Response correctly closes the command window
   4. Tests verify ERL 2 connection reassignment after drop and task reassign on the new connection with correct PDU fields
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 18-01-PLAN.md — Command window conformance tests (CMDSEQ-04, CMDSEQ-05, CMDSEQ-06, CMDSEQ-09)
+- [ ] 18-02-PLAN.md — Command retry and ExpStatSN gap tests (CMDSEQ-07, CMDSEQ-08)
+- [ ] 18-03-PLAN.md — ERL 2 dispatch fix + connection reassignment and task reassign tests (SESS-07, SESS-08)
 
 ### Phase 19: Task Management and Text Negotiation
 **Goal**: TMF PDU fields are verified at wire level and Text Request negotiation covers all advanced features
@@ -169,5 +173,5 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16 -> 17 -> 18 -> 19
 | 15. SCSI Write Mode | v1.1 | 2/2 | Complete    | 2026-04-05 |
 | 16. Error Injection + SNACK | v1.1 | 2/2 | Complete   | 2026-04-05 |
 | 17. Session Mgmt + Async | v1.1 | 3/3 | Complete   | 2026-04-05 |
-| 18. Cmd Window + ERL 2 | v1.1 | 0/0 | Not started | - |
+| 18. Cmd Window + ERL 2 | v1.1 | 0/3 | Planned | - |
 | 19. TMF + Text | v1.1 | 0/0 | Not started | - |
