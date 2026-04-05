@@ -89,7 +89,10 @@ Plans:
   2. Tests verify no unsolicited data is sent when ImmediateData=No/InitialR2T=Yes, and no immediate data when ImmediateData=No/InitialR2T=No
   3. Tests verify unsolicited data F-bit behavior when EDTL equals DataSegmentLength and when FirstBurstLength limits apply
   4. Tests verify F-bit in SCSI Command PDU when InitialR2T=Yes (no unsolicited data follows)
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 15-01-PLAN.md — Shared write-test helpers extraction (helpers_test.go)
+- [ ] 15-02-PLAN.md — SCSI Command PDU wire conformance tests (SCSI-01 through SCSI-07)
 
 ### Phase 16: Error Injection and SCSI Error Handling
 **Goal**: MockTarget can inject error conditions (status codes, sense data, reject PDUs, DataSN gaps) and initiator handles each correctly
@@ -156,7 +159,7 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16 -> 17 -> 18 -> 19
 | 11. Audit Remediation | v1.0 | 4/4 | Complete | 2026-04-03 |
 | 13. PDU Wire Capture + CmdSN | v1.1 | 2/2 | Complete    | 2026-04-04 |
 | 14. Data Transfer + R2T | v1.1 | 4/4 | Complete    | 2026-04-05 |
-| 15. SCSI Write Mode | v1.1 | 0/0 | Not started | - |
+| 15. SCSI Write Mode | v1.1 | 0/2 | Planning    | - |
 | 16. Error Injection + SNACK | v1.1 | 0/0 | Not started | - |
 | 17. Session Mgmt + Async | v1.1 | 0/0 | Not started | - |
 | 18. Cmd Window + ERL 2 | v1.1 | 0/0 | Not started | - |
