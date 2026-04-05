@@ -139,6 +139,14 @@ type NegotiationConfig struct {
 // BoolPtr returns a pointer to the given bool value. Used in NegotiationConfig.
 func BoolPtr(v bool) *bool { return &v }
 
+// boolToYesNo converts a bool to iSCSI "Yes"/"No" string per RFC 7143.
+func boolToYesNo(v bool) string {
+	if v {
+		return "Yes"
+	}
+	return "No"
+}
+
 // Uint32Ptr returns a pointer to the given uint32 value. Used in NegotiationConfig.
 func Uint32Ptr(v uint32) *uint32 { return &v }
 
@@ -442,13 +450,13 @@ func (mt *MockTarget) HandleLogin() {
 					respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: "None"})
 				case "ImmediateData":
 					if negCfg.ImmediateData != nil {
-						respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: strconv.FormatBool(*negCfg.ImmediateData)})
+						respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: boolToYesNo(*negCfg.ImmediateData)})
 					} else {
 						respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: kv.Value})
 					}
 				case "InitialR2T":
 					if negCfg.InitialR2T != nil {
-						respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: strconv.FormatBool(*negCfg.InitialR2T)})
+						respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: boolToYesNo(*negCfg.InitialR2T)})
 					} else {
 						respKVs = append(respKVs, login.KeyValue{Key: kv.Key, Value: kv.Value})
 					}
