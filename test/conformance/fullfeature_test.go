@@ -239,9 +239,10 @@ func TestExecute_RawRead(t *testing.T) {
 	}
 }
 
-// TestStreamRead tests streaming read returns an io.Reader yielding correct data.
+// TestStreamExecuteRead tests StreamExecute returns a streaming io.Reader
+// that yields correct data with bounded memory.
 // IOL: Full-Feature Phase - Streaming Read.
-func TestStreamRead(t *testing.T) {
+func TestStreamExecuteRead(t *testing.T) {
 	blockData := make([]byte, 512)
 	for i := range blockData {
 		blockData[i] = byte(i % 256)
@@ -251,17 +252,31 @@ func TestStreamRead(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	r, err := sess.StreamRead(ctx, 0, 0, 1, 512)
+	// Build a READ(16) CDB manually to exercise StreamExecute.
+	cdb := make([]byte, 16)
+	cdb[0] = 0x88 // READ(16) opcode
+	// LBA = 0 (bytes 2-9), transfer length = 1 block (bytes 10-13)
+	cdb[13] = 1
+
+	sr, err := sess.StreamExecute(ctx, 0, cdb, uiscsi.WithDataIn(512))
 	if err != nil {
-		t.Fatalf("StreamRead: %v", err)
+		t.Fatalf("StreamExecute: %v", err)
 	}
 
-	data, err := io.ReadAll(r)
+	data, err := io.ReadAll(sr.Data)
 	if err != nil {
 		t.Fatalf("ReadAll: %v", err)
 	}
 	if len(data) != 512 {
 		t.Fatalf("len(data): got %d, want 512", len(data))
+	}
+
+	status, _, waitErr := sr.Wait()
+	if waitErr != nil {
+		t.Fatalf("Wait: %v", waitErr)
+	}
+	if status != 0 {
+		t.Fatalf("status: got 0x%02X, want 0x00", status)
 	}
 }
 

@@ -2,7 +2,7 @@
 
 A pure-userspace iSCSI initiator library for Go.
 
-**Status:** v1.1.0 -- full RFC 7143 compliance with 86 wire-level conformance tests and 20 E2E tests against real LIO kernel targets.
+**Status:** v1.1.2 -- full RFC 7143 compliance with 87 wire-level conformance tests and 21 E2E tests against real LIO kernel targets. Bounded-memory streaming I/O for high-throughput devices (tape, etc.).
 
 ## Overview
 
@@ -16,8 +16,9 @@ The library provides both a high-level typed API (ReadBlocks, WriteBlocks, Inqui
 - **RFC 7143 compliant** -- PDU codec, login negotiation, full feature phase
 - **Go-idiomatic API** -- context.Context, io.Reader/io.Writer, functional options
 - **Authentication** -- CHAP and mutual CHAP
-- **Block I/O** -- ReadBlocks/WriteBlocks with `[]byte`, streaming with io.Reader
-- **Raw CDB pass-through** -- send any SCSI command via Execute
+- **Block I/O** -- ReadBlocks/WriteBlocks with `[]byte`, StreamWrite with io.Reader
+- **Raw CDB pass-through** -- Execute (buffered) and StreamExecute (bounded-memory streaming)
+- **Streaming I/O** -- StreamExecute streams Data-In PDUs via bounded-memory channel (~64KB), suitable for tape drives at 400+ MB/s
 - **Error recovery** -- ERL 0 (session reconnect), ERL 1 (SNACK), ERL 2 (connection replace)
 - **Task management** -- ABORT TASK, LUN RESET, TARGET WARM/COLD RESET
 - **Observability** -- slog structured logging, PDU hooks, metrics callbacks
@@ -105,9 +106,12 @@ Key types and functions:
 | `Discover` | Enumerate available iSCSI targets |
 | `Session.ReadBlocks` | Read blocks from a LUN |
 | `Session.WriteBlocks` | Write blocks to a LUN |
-| `Session.Execute` | Raw CDB pass-through |
+| `Session.Execute` | Raw CDB pass-through (returns `[]byte`) |
+| `Session.StreamExecute` | Raw CDB pass-through (returns streaming `io.Reader`, bounded memory) |
 | `Session.Inquiry` | SCSI INQUIRY command |
 | `Session.ReadCapacity` | Query LUN capacity |
+| `ParseSenseData` | Parse raw sense bytes into `SenseInfo` |
+| `CheckStatus` | Convert SCSI status + sense into `*SCSIError` |
 | `WithTarget` | Set target IQN |
 | `WithCHAP` | Enable CHAP authentication |
 | `WithLogger` | Inject slog.Logger |
@@ -120,8 +124,8 @@ Key types and functions:
 The library includes three test tiers:
 
 - **Unit tests** -- table-driven tests for PDU codec, serial arithmetic, sense parsing (`go test ./...`)
-- **Conformance tests** -- 86 wire-level tests against an in-process mock iSCSI target with PDU capture (`test/conformance/`). Covers 84% of the UNH-IOL Initiator Full Feature Phase test suite (see `doc/test_matrix_initiator_ffp.md`).
-- **E2E tests** -- 20 tests against a real Linux LIO kernel target via configfs (`sudo go test -tags e2e ./test/e2e/`)
+- **Conformance tests** -- 87 wire-level tests against an in-process mock iSCSI target with PDU capture (`test/conformance/`). Covers 84% of the UNH-IOL Initiator Full Feature Phase test suite (see `doc/test_matrix_initiator_ffp.md`).
+- **E2E tests** -- 21 tests against a real Linux LIO kernel target via configfs (`sudo go test -tags e2e ./test/e2e/`)
 
 Conformance test areas: CmdSN sequencing, command window enforcement, Data-In/Out PDU fields, R2T fulfillment, SCSI command modes, SNACK recovery, error injection, NOP-Out/In, session lifecycle, async messages, ERL 2 connection replacement, TMF wire fields, Abort Task Set behavior, and Text Request negotiation.
 

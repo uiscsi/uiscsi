@@ -5,6 +5,8 @@ package e2e_test
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
+	"io"
 	"testing"
 	"time"
 
@@ -116,4 +118,208 @@ func TestDataIntegrity(t *testing.T) {
 		t.Fatalf("data integrity check failed at LBA %d", offsetLBA)
 	}
 	t.Logf("LBA %d: write-then-read byte-for-byte match OK", offsetLBA)
+}
+
+// TestStreamExecuteDataIntegrity verifies that StreamExecute delivers data
+// byte-for-byte identical to ReadBlocks, exercising the bounded-memory
+// chanReader path through a real LIO kernel iSCSI target with real TCP,
+// real PDU framing, and real MRDSL negotiation.
+func TestStreamExecuteDataIntegrity(t *testing.T) {
+	lio.RequireRoot(t)
+	lio.RequireModules(t)
+
+	tgt, cleanup := lio.Setup(t, lio.Config{
+		TargetSuffix: "stream",
+		InitiatorIQN: initiatorIQN,
+	})
+	defer cleanup()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	sess, err := uiscsi.Dial(ctx, tgt.Addr,
+		uiscsi.WithTarget(tgt.IQN),
+		uiscsi.WithInitiatorName(initiatorIQN),
+	)
+	if err != nil {
+		t.Fatalf("Dial: %v", err)
+	}
+	defer sess.Close()
+
+	cap, err := sess.ReadCapacity(ctx, 0)
+	if err != nil {
+		t.Fatalf("ReadCapacity: %v", err)
+	}
+	blockSize := cap.BlockSize
+	t.Logf("ReadCapacity: BlockSize=%d LBA=%d", blockSize, cap.LBA)
+
+	// Write a recognizable pattern via WriteBlocks (known-good path).
+	const numBlocks = 16
+	testData := make([]byte, numBlocks*int(blockSize))
+	for i := range testData {
+		testData[i] = byte((i * 7) ^ 0xA5)
+	}
+
+	if err := sess.WriteBlocks(ctx, 0, 0, numBlocks, blockSize, testData); err != nil {
+		t.Fatalf("WriteBlocks: %v", err)
+	}
+
+	// Read back via StreamExecute with a raw READ(16) CDB.
+	cdb := make([]byte, 16)
+	cdb[0] = 0x88 // READ(16)
+	// LBA = 0 (bytes 2-9 are zero)
+	// Transfer length = numBlocks (bytes 10-13, big-endian uint32)
+	binary.BigEndian.PutUint32(cdb[10:14], numBlocks)
+
+	totalBytes := uint32(numBlocks) * blockSize
+	sr, err := sess.StreamExecute(ctx, 0, cdb, uiscsi.WithDataIn(totalBytes))
+	if err != nil {
+		t.Fatalf("StreamExecute: %v", err)
+	}
+
+	// Stream data through the chanReader in small chunks to exercise
+	// the bounded-memory path across multiple PDUs.
+	var got []byte
+	buf := make([]byte, 4096)
+	for {
+		n, readErr := sr.Data.Read(buf)
+		got = append(got, buf[:n]...)
+		if readErr != nil {
+			if readErr == io.EOF {
+				break
+			}
+			t.Fatalf("StreamExecute Read: %v", readErr)
+		}
+	}
+
+	status, sense, waitErr := sr.Wait()
+	if waitErr != nil {
+		t.Fatalf("Wait: %v", waitErr)
+	}
+	if status != 0 {
+		if err := uiscsi.CheckStatus(status, sense); err != nil {
+			t.Fatalf("CheckStatus: %v", err)
+		}
+	}
+
+	if !bytes.Equal(got, testData) {
+		t.Errorf("StreamExecute returned %d bytes, want %d", len(got), len(testData))
+		for i := range testData {
+			if i >= len(got) {
+				t.Errorf("stream data too short at offset %d", i)
+				break
+			}
+			if got[i] != testData[i] {
+				t.Errorf("stream mismatch at offset %d: got 0x%02x, want 0x%02x", i, got[i], testData[i])
+				break
+			}
+		}
+		t.Fatal("StreamExecute data integrity check failed")
+	}
+	t.Logf("StreamExecute: %d bytes streamed, byte-for-byte match OK", len(got))
+}
+
+// TestStreamExecuteWriteRead verifies that StreamExecute works for both
+// write and read directions against a real LIO target. Writes data via
+// StreamExecute + WithDataOut, reads it back via StreamExecute + WithDataIn,
+// and compares byte-for-byte.
+func TestStreamExecuteWriteRead(t *testing.T) {
+	lio.RequireRoot(t)
+	lio.RequireModules(t)
+
+	tgt, cleanup := lio.Setup(t, lio.Config{
+		TargetSuffix: "streamwr",
+		InitiatorIQN: initiatorIQN,
+	})
+	defer cleanup()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	sess, err := uiscsi.Dial(ctx, tgt.Addr,
+		uiscsi.WithTarget(tgt.IQN),
+		uiscsi.WithInitiatorName(initiatorIQN),
+	)
+	if err != nil {
+		t.Fatalf("Dial: %v", err)
+	}
+	defer sess.Close()
+
+	cap, err := sess.ReadCapacity(ctx, 0)
+	if err != nil {
+		t.Fatalf("ReadCapacity: %v", err)
+	}
+	blockSize := cap.BlockSize
+
+	const numBlocks = 8
+	totalBytes := uint32(numBlocks) * blockSize
+
+	// Build test pattern.
+	testData := make([]byte, totalBytes)
+	for i := range testData {
+		testData[i] = byte((i * 13) ^ 0x5A)
+	}
+
+	// Write via StreamExecute + WithDataOut using raw WRITE(16) CDB.
+	writeCDB := make([]byte, 16)
+	writeCDB[0] = 0x8A // WRITE(16)
+	binary.BigEndian.PutUint32(writeCDB[10:14], numBlocks)
+
+	wsr, err := sess.StreamExecute(ctx, 0, writeCDB,
+		uiscsi.WithDataOut(bytes.NewReader(testData), totalBytes),
+	)
+	if err != nil {
+		t.Fatalf("StreamExecute write: %v", err)
+	}
+
+	wStatus, wSense, wErr := wsr.Wait()
+	if wErr != nil {
+		t.Fatalf("write Wait: %v", wErr)
+	}
+	if wStatus != 0 {
+		if err := uiscsi.CheckStatus(wStatus, wSense); err != nil {
+			t.Fatalf("write CheckStatus: %v", err)
+		}
+	}
+	t.Log("StreamExecute write: OK")
+
+	// Read back via StreamExecute + WithDataIn using raw READ(16) CDB.
+	readCDB := make([]byte, 16)
+	readCDB[0] = 0x88 // READ(16)
+	binary.BigEndian.PutUint32(readCDB[10:14], numBlocks)
+
+	rsr, err := sess.StreamExecute(ctx, 0, readCDB, uiscsi.WithDataIn(totalBytes))
+	if err != nil {
+		t.Fatalf("StreamExecute read: %v", err)
+	}
+
+	got, readErr := io.ReadAll(rsr.Data)
+	if readErr != nil {
+		t.Fatalf("StreamExecute Read: %v", readErr)
+	}
+
+	rStatus, rSense, rErr := rsr.Wait()
+	if rErr != nil {
+		t.Fatalf("read Wait: %v", rErr)
+	}
+	if rStatus != 0 {
+		if err := uiscsi.CheckStatus(rStatus, rSense); err != nil {
+			t.Fatalf("read CheckStatus: %v", err)
+		}
+	}
+
+	if !bytes.Equal(got, testData) {
+		t.Errorf("got %d bytes, want %d", len(got), len(testData))
+		for i := range testData {
+			if i >= len(got) {
+				break
+			}
+			if got[i] != testData[i] {
+				t.Errorf("mismatch at offset %d: got 0x%02x, want 0x%02x", i, got[i], testData[i])
+				break
+			}
+		}
+		t.Fatal("StreamExecute write+read integrity check failed")
+	}
+	t.Logf("StreamExecute write+read: %d bytes, byte-for-byte match OK", len(got))
 }

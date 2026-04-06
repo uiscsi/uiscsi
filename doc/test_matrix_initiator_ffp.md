@@ -207,6 +207,22 @@ Maps each test from the **UNH-IOL iSCSI Initiator Full Feature Phase Test Suite 
 | #16.4.6 | RESERVATION CONFLICT → automatic re-issue | Same — error typed correctly; caller handles retry |
 | #14.2 | Multi-connection logout | MaxConnections=1 enforced |
 
+### Streaming I/O (v1.1.2 additions)
+
+StreamExecute provides bounded-memory streaming for arbitrary SCSI commands, critical for high-throughput sequential devices (tape). Tests exercise the chanReader-backed streaming path through both mock and real kernel targets:
+
+| Test | Type | File | Description |
+|------|------|------|-------------|
+| TestStreamExecuteRead | Conformance | `test/conformance/fullfeature_test.go` | StreamExecute with raw READ(16) CDB against mock target, verifies io.Reader + Wait() |
+| TestStreamExecuteDataIntegrity | E2E | `test/e2e/data_test.go` | StreamExecute read via chanReader against real LIO, 16-block byte-for-byte verify |
+| TestStreamExecuteWriteRead | E2E | `test/e2e/data_test.go` | StreamExecute write + read roundtrip against real LIO, byte-for-byte verify |
+| TestTaskStreamingSingleDataIn | Unit | `internal/session/datain_test.go` | Single Data-In with S-bit via chanReader, concurrent read |
+| TestTaskStreamingMultiDataIn | Unit | `internal/session/datain_test.go` | Multi-PDU + SCSIResponse via chanReader |
+| TestTaskStreamingCancel | Unit | `internal/session/datain_test.go` | Mid-transfer cancel propagates error to chanReader |
+| TestTaskStreamingDataSNGap | Unit | `internal/session/datain_test.go` | ERL 0 DataSN gap closes chanReader with error |
+| TestSessionSubmitStreamingRead | Unit | `internal/session/session_test.go` | SubmitStreaming via net.Pipe, multi-PDU + SCSIResponse |
+| TestChanReader* (7 tests) | Unit | `internal/session/chanreader_test.go` | chanReader: basic, partial, error, concurrent, double-close |
+
 ### Well-Covered Areas (v1.1 additions highlighted)
 
 All 7 phases of milestone v1.1 (Phases 13-19) added wire-level PDU capture conformance tests:
