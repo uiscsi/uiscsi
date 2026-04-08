@@ -18,15 +18,27 @@ type routerEntry struct {
 // a request, it registers an ITT via Register and waits on the returned
 // channel. When the read pump receives a response, it calls Dispatch with
 // the ITT from the BHS to deliver the response to the correct waiter.
+// DefaultRouterBufDepth is the default persistent channel buffer depth.
+const DefaultRouterBufDepth = 64
+
 type Router struct {
-	mu      sync.Mutex
-	pending map[uint32]*routerEntry
-	nextITT uint32
+	mu              sync.Mutex
+	pending         map[uint32]*routerEntry
+	nextITT         uint32
+	persistentDepth int // configurable persistent channel depth
 }
 
 // NewRouter creates a Router with an empty pending map.
-func NewRouter() *Router {
-	return &Router{pending: make(map[uint32]*routerEntry)}
+// persistentDepth sets the buffer depth for persistent registrations
+// (0 = DefaultRouterBufDepth).
+func NewRouter(persistentDepth int) *Router {
+	if persistentDepth <= 0 {
+		persistentDepth = DefaultRouterBufDepth
+	}
+	return &Router{
+		pending:         make(map[uint32]*routerEntry),
+		persistentDepth: persistentDepth,
+	}
 }
 
 // Register allocates the next available ITT (skipping the reserved value
@@ -60,7 +72,7 @@ func (r *Router) RegisterPersistent(itt uint32) <-chan *RawPDU {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	ch := make(chan *RawPDU, 64)
+	ch := make(chan *RawPDU, r.persistentDepth)
 	r.pending[itt] = &routerEntry{ch: ch, persistent: true}
 	return ch
 }

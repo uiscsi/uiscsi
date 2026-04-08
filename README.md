@@ -125,16 +125,20 @@ Full documentation is available on [pkg.go.dev](https://pkg.go.dev/github.com/rk
 
 ### Performance Tuning
 
-For high-throughput workloads (tape drives, large sequential I/O), increase the PDU data segment size:
+For high-throughput workloads (tape drives, large sequential I/O):
 
 ```go
 sess, err := uiscsi.Dial(ctx, addr,
     uiscsi.WithTarget(iqn),
-    uiscsi.WithMaxRecvDataSegmentLength(262144), // 256KB per PDU
+    uiscsi.WithStreamBufDepth(128),              // streaming PDU buffer (default 128)
+    uiscsi.WithRouterBufDepth(64),               // dispatch buffer (default 64)
+    uiscsi.WithMaxRecvDataSegmentLength(262144),  // max PDU size (default 8KB)
+    uiscsi.WithMaxBurstLength(524288),            // write burst size (default 256KB)
+    uiscsi.WithFirstBurstLength(131072),          // unsolicited write (default 64KB)
 )
 ```
 
-The default `MaxRecvDataSegmentLength` is 8192 bytes (8KB). With 8KB PDUs, a 4MB tape block requires ~512 PDUs with per-PDU overhead. With 256KB PDUs, the same block needs only ~16 PDUs. StreamExecute's bounded-memory window scales proportionally: 8 × MRDSL (e.g., 8 × 256KB = 2MB in-flight).
+**StreamBufDepth** and **RouterBufDepth** control internal PDU buffering. These are critical for tape drives: shallow buffers cause TCP backpressure during GC pauses, stopping the tape drive (shoe-shining). The defaults (128 + 64) provide ~1.5MB of buffering at 8KB MRDSL — enough to absorb 50+ ms of consumer stalls.
 
 ### Error Types
 

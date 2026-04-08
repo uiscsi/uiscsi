@@ -6,7 +6,7 @@ import (
 )
 
 func TestRouterRegister_MonotonicallyIncreasing(t *testing.T) {
-	r := NewRouter()
+	r := NewRouter(0)
 	var prev uint32
 	for i := 0; i < 10; i++ {
 		itt, ch := r.Register()
@@ -21,7 +21,7 @@ func TestRouterRegister_MonotonicallyIncreasing(t *testing.T) {
 }
 
 func TestRouterRegister_Skips0xFFFFFFFF(t *testing.T) {
-	r := NewRouter()
+	r := NewRouter(0)
 	// Set nextITT to just before the reserved value.
 	r.mu.Lock()
 	r.nextITT = 0xFFFFFFFE
@@ -43,7 +43,7 @@ func TestRouterRegister_Skips0xFFFFFFFF(t *testing.T) {
 }
 
 func TestRouterDispatch_RegisteredITT(t *testing.T) {
-	r := NewRouter()
+	r := NewRouter(0)
 	itt, ch := r.Register()
 
 	raw := &RawPDU{}
@@ -61,7 +61,7 @@ func TestRouterDispatch_RegisteredITT(t *testing.T) {
 }
 
 func TestRouterDispatch_UnregisteredITT(t *testing.T) {
-	r := NewRouter()
+	r := NewRouter(0)
 	ok := r.Dispatch(999, &RawPDU{})
 	if ok {
 		t.Error("Dispatch returned true for unregistered ITT")
@@ -69,7 +69,7 @@ func TestRouterDispatch_UnregisteredITT(t *testing.T) {
 }
 
 func TestRouterUnregister(t *testing.T) {
-	r := NewRouter()
+	r := NewRouter(0)
 	itt, _ := r.Register()
 	r.Unregister(itt)
 
@@ -80,7 +80,7 @@ func TestRouterUnregister(t *testing.T) {
 }
 
 func TestRouterPendingCount(t *testing.T) {
-	r := NewRouter()
+	r := NewRouter(0)
 	if r.PendingCount() != 0 {
 		t.Errorf("initial PendingCount: got %d, want 0", r.PendingCount())
 	}
@@ -103,7 +103,7 @@ func TestRouterPendingCount(t *testing.T) {
 }
 
 func TestRouterConcurrent(t *testing.T) {
-	r := NewRouter()
+	r := NewRouter(0)
 	const goroutines = 50
 
 	var wg sync.WaitGroup

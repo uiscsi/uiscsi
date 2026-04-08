@@ -128,6 +128,8 @@ type sessionConfig struct {
 	targetAddr           string
 	loginOpts            []login.LoginOption
 	digestByteOrder      binary.ByteOrder
+	streamBufDepth       int // chanReader buffer depth (0 = default 128)
+	routerBufDepth       int // persistent router channel depth (0 = default 64)
 }
 
 // defaultConfig returns a sessionConfig with sensible defaults.
@@ -192,6 +194,24 @@ func WithReconnectBackoff(base time.Duration) SessionOption {
 func WithSNACKTimeout(d time.Duration) SessionOption {
 	return func(c *sessionConfig) {
 		c.snackTimeout = d
+	}
+}
+
+// WithStreamBufDepth sets the chanReader buffer depth for streaming reads
+// (StreamExecute / SubmitStreaming). Higher values absorb more consumer
+// stalls before triggering TCP backpressure. Default is 128 slots.
+func WithStreamBufDepth(depth int) SessionOption {
+	return func(c *sessionConfig) {
+		c.streamBufDepth = depth
+	}
+}
+
+// WithRouterBufDepth sets the PDU dispatch channel depth for persistent
+// task routing. Higher values absorb more processing stalls before blocking
+// the read pump. Default is 64 slots.
+func WithRouterBufDepth(depth int) SessionOption {
+	return func(c *sessionConfig) {
+		c.routerBufDepth = depth
 	}
 }
 

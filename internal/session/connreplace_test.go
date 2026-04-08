@@ -468,7 +468,7 @@ func TestERL2ConnReplace(t *testing.T) {
 		)
 
 		// Create a fake in-flight task that will fail during reassignment.
-		tk := newTask(100, true, false)
+		tk := newTask(100, true, false, 0)
 		tk.lun = 0
 		sess.mu.Lock()
 		sess.tasks[100] = tk
@@ -523,7 +523,7 @@ func TestERL2ConnReplace(t *testing.T) {
 		tasks := make([]*task, numTasks)
 		for i := 0; i < numTasks; i++ {
 			itt := uint32(200 + i)
-			tk := newTask(itt, true, false)
+			tk := newTask(itt, true, false, 0)
 			tk.lun = 0
 			sess.mu.Lock()
 			sess.tasks[itt] = tk

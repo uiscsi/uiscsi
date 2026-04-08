@@ -5,13 +5,9 @@ import (
 	"sync"
 )
 
-// chanBufSize is the channel buffer capacity for streaming Data-In delivery.
-// With default MaxRecvDataSegmentLength of 8192 bytes, 128 slots = ~1MB of
-// in-flight data (~38ms at 26 MB/s). This must be large enough to absorb
-// GC pauses and consumer stalls without triggering TCP backpressure —
-// once the TCP window closes, tape drives stop streaming and require
-// expensive mechanical repositioning (shoe-shining).
-const chanBufSize = 128
+// defaultChanBufSize is the default channel buffer capacity for streaming
+// Data-In delivery. Configurable via WithStreamBufDepth.
+const defaultChanBufSize = 128
 
 // chanReader streams data from a producer (handleDataIn) to a consumer
 // (the caller reading Result.Data or the io.Reader from SubmitStreaming)
@@ -31,10 +27,14 @@ type chanReader struct {
 	closed  bool       // guards against double close
 }
 
-// newChanReader creates a chanReader ready for use.
-func newChanReader() *chanReader {
+// newChanReader creates a chanReader with the given buffer depth.
+// If depth <= 0, defaultChanBufSize is used.
+func newChanReader(depth int) *chanReader {
+	if depth <= 0 {
+		depth = defaultChanBufSize
+	}
 	return &chanReader{
-		ch: make(chan []byte, chanBufSize),
+		ch: make(chan []byte, depth),
 	}
 }
 

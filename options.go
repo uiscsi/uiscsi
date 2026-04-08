@@ -158,6 +158,46 @@ func WithDigestByteOrder(bo binary.ByteOrder) Option {
 	}
 }
 
+// WithMaxBurstLength sets the maximum data burst size for solicited Data-Out
+// transfers (write operations). Default is 262144 (256KB). Increasing this
+// allows larger write bursts per R2T, reducing R2T round-trips for large writes.
+func WithMaxBurstLength(size uint32) Option {
+	return func(c *dialConfig) {
+		c.loginOpts = append(c.loginOpts, login.WithOperationalOverrides(map[string]string{
+			"MaxBurstLength": fmt.Sprintf("%d", size),
+		}))
+	}
+}
+
+// WithFirstBurstLength sets the maximum unsolicited Data-Out size for write
+// operations. Default is 65536 (64KB). Data up to this size is sent
+// immediately with the SCSI Command PDU, without waiting for an R2T.
+func WithFirstBurstLength(size uint32) Option {
+	return func(c *dialConfig) {
+		c.loginOpts = append(c.loginOpts, login.WithOperationalOverrides(map[string]string{
+			"FirstBurstLength": fmt.Sprintf("%d", size),
+		}))
+	}
+}
+
+// WithStreamBufDepth sets the streaming Data-In buffer depth (number of PDU
+// chunks buffered in the chanReader channel). Higher values absorb consumer
+// stalls without triggering TCP backpressure — critical for tape drives that
+// stop streaming on any TCP stall. Default is 128 slots.
+func WithStreamBufDepth(depth int) Option {
+	return func(c *dialConfig) {
+		c.sessionOpts = append(c.sessionOpts, session.WithStreamBufDepth(depth))
+	}
+}
+
+// WithRouterBufDepth sets the PDU dispatch buffer depth per task. Higher
+// values absorb read pump stalls. Default is 64 slots.
+func WithRouterBufDepth(depth int) Option {
+	return func(c *dialConfig) {
+		c.sessionOpts = append(c.sessionOpts, session.WithRouterBufDepth(depth))
+	}
+}
+
 // WithMaxReconnectAttempts sets the maximum number of ERL 0 reconnect attempts.
 func WithMaxReconnectAttempts(n int) Option {
 	return func(c *dialConfig) {

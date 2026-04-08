@@ -55,7 +55,7 @@ func TestReadPump_BasicDispatch(t *testing.T) {
 	defer rConn.Close()
 	defer wConn.Close()
 
-	router := NewRouter()
+	router := NewRouter(0)
 	unsolicitedCh := make(chan *RawPDU, 10)
 
 	// Register 3 ITTs and record the channels
@@ -104,7 +104,7 @@ func TestReadPump_UnsolicitedITT(t *testing.T) {
 	defer rConn.Close()
 	defer wConn.Close()
 
-	router := NewRouter()
+	router := NewRouter(0)
 	unsolicitedCh := make(chan *RawPDU, 10)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -184,7 +184,7 @@ func TestPump_Shutdown(t *testing.T) {
 
 	writeCh := make(chan *RawPDU, 10)
 	unsolicitedCh := make(chan *RawPDU, 10)
-	router := NewRouter()
+	router := NewRouter(0)
 
 	writeErr := make(chan error, 1)
 	readErr := make(chan error, 1)
@@ -226,7 +226,7 @@ func TestPump_FullRoundTrip(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	router := NewRouter()
+	router := NewRouter(0)
 	unsolicitedCh := make(chan *RawPDU, 10)
 	writeCh := make(chan *RawPDU, 10)
 
@@ -259,7 +259,7 @@ func TestReadPumpPDUHook(t *testing.T) {
 	defer rConn.Close()
 	defer wConn.Close()
 
-	router := NewRouter()
+	router := NewRouter(0)
 	unsolicitedCh := make(chan *RawPDU, 10)
 
 	itt, respCh := router.Register()
@@ -395,7 +395,7 @@ func TestReadPumpLogger(t *testing.T) {
 	defer rConn.Close()
 	defer wConn.Close()
 
-	router := NewRouter()
+	router := NewRouter(0)
 	unsolicitedCh := make(chan *RawPDU, 10)
 
 	itt, respCh := router.Register()

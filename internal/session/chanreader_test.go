@@ -8,7 +8,7 @@ import (
 )
 
 func TestChanReaderBasic(t *testing.T) {
-	cr := newChanReader()
+	cr := newChanReader(0)
 
 	// Send 3 chunks, then close.
 	chunks := []string{"hello", " ", "world"}
@@ -27,7 +27,7 @@ func TestChanReaderBasic(t *testing.T) {
 }
 
 func TestChanReaderPartialRead(t *testing.T) {
-	cr := newChanReader()
+	cr := newChanReader(0)
 
 	cr.ch <- []byte("ABCDEFGH")
 	cr.close()
@@ -51,7 +51,7 @@ func TestChanReaderPartialRead(t *testing.T) {
 }
 
 func TestChanReaderCloseWithError(t *testing.T) {
-	cr := newChanReader()
+	cr := newChanReader(0)
 	myErr := errors.New("connection lost")
 
 	// Buffer some data then close with error.
@@ -76,7 +76,7 @@ func TestChanReaderCloseWithError(t *testing.T) {
 }
 
 func TestChanReaderConcurrent(t *testing.T) {
-	cr := newChanReader()
+	cr := newChanReader(0)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -99,7 +99,7 @@ func TestChanReaderConcurrent(t *testing.T) {
 }
 
 func TestChanReaderCloseBeforeRead(t *testing.T) {
-	cr := newChanReader()
+	cr := newChanReader(0)
 	cr.close()
 
 	buf := make([]byte, 10)
@@ -113,13 +113,13 @@ func TestChanReaderCloseBeforeRead(t *testing.T) {
 }
 
 func TestChanReaderDoubleClose(t *testing.T) {
-	cr := newChanReader()
+	cr := newChanReader(0)
 	cr.close()
 	cr.close() // must not panic
 }
 
 func TestChanReaderDoubleCloseWithError(t *testing.T) {
-	cr := newChanReader()
+	cr := newChanReader(0)
 	cr.closeWithError(errors.New("err1"))
 	cr.closeWithError(errors.New("err2")) // must not panic; first error wins
 

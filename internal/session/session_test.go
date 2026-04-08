@@ -588,7 +588,7 @@ func TestSCSIResponseSenseDataExtraction(t *testing.T) {
 		Data:   dataSegment,
 	}
 
-	tk := newTask(1, false, false)
+	tk := newTask(1, false, false, 0)
 	tk.handleSCSIResponse(resp)
 
 	result := <-tk.resultCh
@@ -633,7 +633,7 @@ func TestSCSIResponseSenseDataEmpty(t *testing.T) {
 				Status: 0x00,
 				Data:   tt.data,
 			}
-			tk := newTask(1, false, false)
+			tk := newTask(1, false, false, 0)
 			tk.handleSCSIResponse(resp)
 
 			result := <-tk.resultCh

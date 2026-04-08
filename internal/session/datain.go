@@ -43,7 +43,7 @@ type task struct {
 // accumulation mechanism is allocated: bytes.Buffer for normal mode, or
 // chanReader for streaming mode (bounded memory). If isWrite is true,
 // no read buffer is allocated.
-func newTask(itt uint32, isRead bool, isWrite bool, streaming ...bool) *task {
+func newTask(itt uint32, isRead bool, isWrite bool, streamBufDepth int) *task {
 	t := &task{
 		itt:       itt,
 		resultCh:  make(chan Result, 1),
@@ -52,9 +52,9 @@ func newTask(itt uint32, isRead bool, isWrite bool, streaming ...bool) *task {
 		startTime: time.Now(),
 	}
 	if isRead {
-		if len(streaming) > 0 && streaming[0] {
+		if streamBufDepth != 0 {
 			t.streaming = true
-			t.dataReader = newChanReader()
+			t.dataReader = newChanReader(streamBufDepth)
 		} else {
 			t.buf = &bytes.Buffer{}
 		}

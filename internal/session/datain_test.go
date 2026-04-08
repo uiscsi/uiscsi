@@ -9,7 +9,7 @@ import (
 )
 
 func TestTaskSingleDataIn(t *testing.T) {
-	tk := newTask(1, true, false)
+	tk := newTask(1, true, false, 0)
 
 	data := []byte("hello iSCSI")
 	din := &pdu.DataIn{
@@ -41,7 +41,7 @@ func TestTaskSingleDataIn(t *testing.T) {
 }
 
 func TestTaskMultiDataIn(t *testing.T) {
-	tk := newTask(1, true, false)
+	tk := newTask(1, true, false, 0)
 
 	// 3 Data-In PDUs without status, then a SCSIResponse.
 	chunks := [][]byte{
@@ -84,7 +84,7 @@ func TestTaskMultiDataIn(t *testing.T) {
 }
 
 func TestTaskDataSNGap(t *testing.T) {
-	tk := newTask(1, true, false)
+	tk := newTask(1, true, false, 0)
 
 	// First Data-In is fine.
 	tk.handleDataIn(&pdu.DataIn{
@@ -107,7 +107,7 @@ func TestTaskDataSNGap(t *testing.T) {
 }
 
 func TestTaskOffsetMismatch(t *testing.T) {
-	tk := newTask(1, true, false)
+	tk := newTask(1, true, false, 0)
 
 	// First Data-In.
 	tk.handleDataIn(&pdu.DataIn{
@@ -130,7 +130,7 @@ func TestTaskOffsetMismatch(t *testing.T) {
 }
 
 func TestTaskStreamingReader(t *testing.T) {
-	tk := newTask(1, true, false)
+	tk := newTask(1, true, false, 0)
 
 	// Feed 3 Data-In PDUs of 8 bytes each, then a SCSIResponse.
 	chunks := [][]byte{
@@ -177,7 +177,7 @@ func TestTaskStreamingReader(t *testing.T) {
 }
 
 func TestTaskStreamingSingleDataIn(t *testing.T) {
-	tk := newTask(1, true, false, true) // streaming=true
+	tk := newTask(1, true, false, 8) // streaming=true
 
 	data := []byte("streaming hello")
 
@@ -216,7 +216,7 @@ func TestTaskStreamingSingleDataIn(t *testing.T) {
 }
 
 func TestTaskStreamingMultiDataIn(t *testing.T) {
-	tk := newTask(1, true, false, true) // streaming=true
+	tk := newTask(1, true, false, 8) // streaming=true
 
 	chunks := [][]byte{
 		[]byte("chunk1"),
@@ -258,7 +258,7 @@ func TestTaskStreamingMultiDataIn(t *testing.T) {
 }
 
 func TestTaskStreamingCancel(t *testing.T) {
-	tk := newTask(1, true, false, true) // streaming=true
+	tk := newTask(1, true, false, 8) // streaming=true
 
 	// Feed one chunk then cancel.
 	tk.handleDataIn(&pdu.DataIn{
@@ -280,7 +280,7 @@ func TestTaskStreamingCancel(t *testing.T) {
 }
 
 func TestTaskStreamingDataSNGap(t *testing.T) {
-	tk := newTask(1, true, false, true) // streaming=true, ERL 0
+	tk := newTask(1, true, false, 8) // streaming=true, ERL 0
 
 	done := make(chan error, 1)
 	go func() {
@@ -310,7 +310,7 @@ func TestTaskStreamingDataSNGap(t *testing.T) {
 }
 
 func TestTaskNonReadCommand(t *testing.T) {
-	tk := newTask(1, false, false) // non-read
+	tk := newTask(1, false, false, 0) // non-read
 
 	resp := &pdu.SCSIResponse{
 		Status: 0x00,

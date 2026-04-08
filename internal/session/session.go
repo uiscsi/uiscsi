@@ -72,7 +72,7 @@ func NewSession(conn *transport.Conn, params login.NegotiatedParams, opts ...Ses
 	s := &Session{
 		conn:       conn,
 		params:     params,
-		router:     transport.NewRouter(),
+		router:     transport.NewRouter(cfg.routerBufDepth),
 		writeCh:    make(chan *transport.RawPDU, 64),
 		unsolCh:    make(chan *transport.RawPDU, 16),
 		window:     newCmdWindow(params.CmdSN, params.CmdSN, params.CmdSN),
@@ -141,7 +141,7 @@ func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error
 	}
 
 	// Create task for tracking this command.
-	tk := newTask(itt, cmd.Read, isWrite)
+	tk := newTask(itt, cmd.Read, isWrite, 0) // non-streaming
 	tk.lun = cmd.LUN  // Store LUN for TMF LUN-based cleanup
 	tk.cmd = cmd       // Store for retry during ERL 0 recovery
 	tk.cmdSN = cmdSN   // Store for same-connection retry at ERL >= 1
@@ -280,7 +280,12 @@ func (s *Session) SubmitStreaming(ctx context.Context, cmd Command) (<-chan Resu
 		cmd.Write = true
 	}
 
-	tk := newTask(itt, cmd.Read, isWrite, true) // streaming=true
+	// Streaming with configured depth. If config is 0, use default.
+	depth := s.cfg.streamBufDepth
+	if depth <= 0 {
+		depth = defaultChanBufSize
+	}
+	tk := newTask(itt, cmd.Read, isWrite, depth)
 	tk.lun = cmd.LUN
 	tk.cmd = cmd
 	tk.cmdSN = cmdSN

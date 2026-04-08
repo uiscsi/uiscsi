@@ -14,7 +14,7 @@ func TestSNACK(t *testing.T) {
 	t.Run("datasn_gap_triggers_snack", func(t *testing.T) {
 		writeCh := make(chan *transport.RawPDU, 16)
 		expStatSNFunc := func() uint32 { return 42 }
-		tk := newTask(10, true, false)
+		tk := newTask(10, true, false, 0)
 		tk.erl = 1
 		tk.getWriteCh = func() chan<- *transport.RawPDU { return writeCh }
 		tk.expStatSNFunc = expStatSNFunc
@@ -66,7 +66,7 @@ func TestSNACK(t *testing.T) {
 	t.Run("gap_fill_completes_reassembly", func(t *testing.T) {
 		writeCh := make(chan *transport.RawPDU, 16)
 		expStatSNFunc := func() uint32 { return 42 }
-		tk := newTask(10, true, false)
+		tk := newTask(10, true, false, 0)
 		tk.erl = 1
 		tk.getWriteCh = func() chan<- *transport.RawPDU { return writeCh }
 		tk.expStatSNFunc = expStatSNFunc
@@ -114,7 +114,7 @@ func TestSNACK(t *testing.T) {
 	})
 
 	t.Run("erl0_gap_is_fatal", func(t *testing.T) {
-		tk := newTask(10, true, false)
+		tk := newTask(10, true, false, 0)
 		tk.erl = 0 // ERL 0 -- no SNACK
 
 		// DataSN=0.
@@ -140,7 +140,7 @@ func TestSNACK(t *testing.T) {
 	t.Run("snack_uses_task_itt", func(t *testing.T) {
 		writeCh := make(chan *transport.RawPDU, 16)
 		expStatSNFunc := func() uint32 { return 99 }
-		tk := newTask(42, true, false)
+		tk := newTask(42, true, false, 0)
 		tk.erl = 1
 		tk.getWriteCh = func() chan<- *transport.RawPDU { return writeCh }
 		tk.expStatSNFunc = expStatSNFunc
@@ -161,7 +161,7 @@ func TestSNACK(t *testing.T) {
 	t.Run("multiple_gaps", func(t *testing.T) {
 		writeCh := make(chan *transport.RawPDU, 16)
 		expStatSNFunc := func() uint32 { return 0 }
-		tk := newTask(10, true, false)
+		tk := newTask(10, true, false, 0)
 		tk.erl = 1
 		tk.getWriteCh = func() chan<- *transport.RawPDU { return writeCh }
 		tk.expStatSNFunc = expStatSNFunc
@@ -206,7 +206,7 @@ func TestSNACK(t *testing.T) {
 	t.Run("timeout_tail_loss", func(t *testing.T) {
 		writeCh := make(chan *transport.RawPDU, 16)
 		expStatSNFunc := func() uint32 { return 50 }
-		tk := newTask(10, true, false)
+		tk := newTask(10, true, false, 0)
 		tk.erl = 1
 		tk.getWriteCh = func() chan<- *transport.RawPDU { return writeCh }
 		tk.expStatSNFunc = expStatSNFunc
@@ -239,7 +239,7 @@ func TestSNACK(t *testing.T) {
 	t.Run("timeout_reset_on_datain", func(t *testing.T) {
 		writeCh := make(chan *transport.RawPDU, 16)
 		expStatSNFunc := func() uint32 { return 50 }
-		tk := newTask(10, true, false)
+		tk := newTask(10, true, false, 0)
 		tk.erl = 1
 		tk.getWriteCh = func() chan<- *transport.RawPDU { return writeCh }
 		tk.expStatSNFunc = expStatSNFunc
@@ -286,7 +286,7 @@ func TestSNACK(t *testing.T) {
 func TestSNACK_SendTimeoutOnFullChannel(t *testing.T) {
 	// Create a zero-buffered channel that will always block.
 	writeCh := make(chan *transport.RawPDU)
-	tk := newTask(10, true, false)
+	tk := newTask(10, true, false, 0)
 	tk.erl = 1
 	tk.getWriteCh = func() chan<- *transport.RawPDU { return writeCh }
 	tk.expStatSNFunc = func() uint32 { return 1 }
