@@ -1,6 +1,7 @@
 package scsi
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 
@@ -62,6 +63,36 @@ func ModeSense10(lun uint64, pageCode, subpageCode uint8, allocLen uint16, opts 
 	binary.BigEndian.PutUint16(cmd.CDB[7:9], allocLen)
 	cmd.Read = true
 	cmd.ExpectedDataTransferLen = uint32(allocLen)
+	cmd.LUN = lun
+	return cmd
+}
+
+// ModeSelect6 returns a MODE SELECT (6) command (opcode 0x15).
+// PF (Page Format) is set. data contains the mode parameter header +
+// block descriptor + mode pages to send.
+func ModeSelect6(lun uint64, data []byte) session.Command {
+	var cmd session.Command
+	cmd.CDB[0] = OpModeSelect6
+	cmd.CDB[1] = 0x10 // PF bit (bit 4)
+	cmd.CDB[4] = uint8(len(data))
+	cmd.Write = true
+	cmd.Data = bytes.NewReader(data)
+	cmd.ExpectedDataTransferLen = uint32(len(data))
+	cmd.LUN = lun
+	return cmd
+}
+
+// ModeSelect10 returns a MODE SELECT (10) command (opcode 0x55).
+// PF (Page Format) is set. data contains the mode parameter header +
+// block descriptor + mode pages to send.
+func ModeSelect10(lun uint64, data []byte) session.Command {
+	var cmd session.Command
+	cmd.CDB[0] = OpModeSelect10
+	cmd.CDB[1] = 0x10 // PF bit (bit 4)
+	binary.BigEndian.PutUint16(cmd.CDB[7:9], uint16(len(data)))
+	cmd.Write = true
+	cmd.Data = bytes.NewReader(data)
+	cmd.ExpectedDataTransferLen = uint32(len(data))
 	cmd.LUN = lun
 	return cmd
 }

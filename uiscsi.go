@@ -2,7 +2,7 @@
 // It handles TCP connection, login negotiation, and SCSI command transport
 // over iSCSI PDUs entirely in userspace.
 //
-// Basic usage:
+// # Quick Start
 //
 //	sess, err := uiscsi.Dial(ctx, "192.168.1.100:3260",
 //	    uiscsi.WithTarget("iqn.2026-03.com.example:storage"),
@@ -10,21 +10,44 @@
 //	if err != nil { ... }
 //	defer sess.Close()
 //
-//	data, err := sess.ReadBlocks(ctx, 0, 0, 1, 512)
+//	data, err := sess.SCSI().ReadBlocks(ctx, 0, 0, 1, 512)
 //
-// # Streaming I/O
+// # API Tiers
 //
-// For high-throughput sequential devices (tape drives, etc.),
-// [Session.StreamExecute] provides bounded-memory streaming of arbitrary
-// SCSI commands. Unlike [Session.Execute] which buffers the entire
-// response into []byte, StreamExecute returns an [io.Reader] that
-// delivers data as PDUs arrive with ~64KB peak memory regardless of
-// transfer size.
+// uiscsi provides three tiers of SCSI command access, each with different
+// error handling. Choose based on your use case:
 //
-//	sr, err := sess.StreamExecute(ctx, lun, cdb, uiscsi.WithDataIn(blockSize))
-//	if err != nil { ... }
+// ## Tier 1: Typed SCSI Methods (recommended for common operations)
+//
+// Access via [Session.SCSI]. Returns parsed Go types. CHECK CONDITION is
+// automatically converted to [*SCSIError].
+//
+//	data, err := sess.SCSI().ReadBlocks(ctx, lun, lba, blocks, blockSize)
+//	inq, err := sess.SCSI().Inquiry(ctx, lun)
+//	err := sess.SCSI().ModeSelect6(ctx, lun, modeData)
+//
+// ## Tier 2: Buffered Raw CDB (for device-specific commands)
+//
+// Access via [Session.Raw]. Returns raw status + sense bytes. The caller
+// interprets SCSI status. Use [CheckStatus] or [ParseSenseData] for convenience.
+//
+//	result, err := sess.Raw().Execute(ctx, lun, cdb, uiscsi.WithDataIn(256))
+//	if err := uiscsi.CheckStatus(result.Status, result.SenseData); err != nil { ... }
+//
+// ## Tier 3: Streaming Raw CDB (for high-throughput sequential I/O)
+//
+// Access via [Session.Raw]. Response data delivered as [io.Reader] with
+// bounded memory (~64KB). Critical for tape drives and large block transfers.
+//
+//	sr, err := sess.Raw().StreamExecute(ctx, lun, cdb, uiscsi.WithDataIn(blockSize))
 //	_, err = io.Copy(dst, sr.Data)
 //	status, sense, err := sr.Wait()
+//
+// # Other API Groups
+//
+// Task management: [Session.TMF] — AbortTask, LUNReset, TargetWarmReset, etc.
+//
+// Protocol operations: [Session.Protocol] — Logout, SendExpStatSNConfirmation.
 package uiscsi
 
 import (
@@ -84,7 +107,9 @@ func Dial(ctx context.Context, addr string, opts ...Option) (*Session, error) {
 	// Step 4: Create session.
 	s := session.NewSession(tc, *params, allSessionOpts...)
 
-	return &Session{s: s}, nil
+	sess := &Session{s: s}
+	sess.initOps()
+	return sess, nil
 }
 
 // Discover performs a SendTargets discovery against the iSCSI target at addr.

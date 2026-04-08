@@ -18,6 +18,7 @@ const (
 	OpTestUnitReady       = 0x00
 	OpRequestSense        = 0x03
 	OpInquiry             = 0x12
+	OpModeSelect6         = 0x15
 	OpModeSense6          = 0x1A
 	OpStartStopUnit       = 0x1B
 	OpReadCapacity10      = 0x25
@@ -27,6 +28,7 @@ const (
 	OpSynchronizeCache10  = 0x35
 	OpWriteSame10         = 0x41
 	OpUnmap               = 0x42
+	OpModeSelect10        = 0x55
 	OpModeSense10         = 0x5A
 	OpPersistReserveIn    = 0x5E
 	OpPersistReserveOut   = 0x5F

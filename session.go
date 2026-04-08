@@ -1,8 +1,8 @@
-// session.go implements the Session type and all SCSI command methods.
+// session.go defines the Session type, accessor methods for grouped APIs,
+// and deprecated flat methods for backward compatibility.
 package uiscsi
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -12,22 +12,53 @@ import (
 )
 
 // Session represents an active iSCSI session. It wraps the internal session
-// and provides typed SCSI command methods, task management, and raw CDB
-// pass-through.
+// and provides grouped APIs for SCSI commands, task management, raw CDB
+// pass-through, and protocol operations.
+//
+// Use the accessor methods to access each API group:
+//
+//	sess.SCSI()     — typed SCSI commands (Inquiry, ReadBlocks, ModeSelect, etc.)
+//	sess.TMF()      — task management (AbortTask, LUNReset, etc.)
+//	sess.Raw()      — raw CDB pass-through (Execute, StreamExecute)
+//	sess.Protocol() — low-level iSCSI protocol (Logout, SendExpStatSNConfirmation)
 type Session struct {
-	s *session.Session
+	s    *session.Session
+	scsi SCSIOps
+	tmf  TMFOps
+	raw  RawOps
+	prot ProtocolOps
 }
 
-// ── Session lifecycle ──────────────────────────────────────────────────
+// initOps sets up the accessor structs after session creation.
+func (s *Session) initOps() {
+	s.scsi = SCSIOps{s: s.s}
+	s.tmf = TMFOps{s: s}
+	s.raw = RawOps{s: s}
+	s.prot = ProtocolOps{s: s}
+}
 
 // Close shuts down the session, performing a graceful logout if possible.
 func (s *Session) Close() error {
 	return s.s.Close()
 }
 
+// SCSI returns the typed SCSI command interface.
+func (s *Session) SCSI() *SCSIOps { return &s.scsi }
+
+// TMF returns the task management function interface.
+func (s *Session) TMF() *TMFOps { return &s.tmf }
+
+// Raw returns the raw CDB pass-through interface.
+func (s *Session) Raw() *RawOps { return &s.raw }
+
+// Protocol returns the low-level iSCSI protocol interface.
+func (s *Session) Protocol() *ProtocolOps { return &s.prot }
+
+// ── Internal helpers used by all Ops types ────────────────────────────
+
 // submitAndWait submits a command and waits for the result.
-func (s *Session) submitAndWait(ctx context.Context, cmd session.Command) (session.Result, error) {
-	resultCh, err := s.s.Submit(ctx, cmd)
+func submitAndWait(ss *session.Session, ctx context.Context, cmd session.Command) (session.Result, error) {
+	resultCh, err := ss.Submit(ctx, cmd)
 	if err != nil {
 		return session.Result{}, wrapTransportError("submit", err)
 	}
@@ -41,9 +72,8 @@ func (s *Session) submitAndWait(ctx context.Context, cmd session.Command) (sessi
 }
 
 // submitAndCheck submits a command, waits, and checks the result for errors.
-// Returns the data bytes on success.
-func (s *Session) submitAndCheck(ctx context.Context, cmd session.Command) ([]byte, error) {
-	result, err := s.submitAndWait(ctx, cmd)
+func submitAndCheck(ss *session.Session, ctx context.Context, cmd session.Command) ([]byte, error) {
+	result, err := submitAndWait(ss, ctx, cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +81,6 @@ func (s *Session) submitAndCheck(ctx context.Context, cmd session.Command) ([]by
 		return nil, wrapTransportError("command", result.Err)
 	}
 	if result.Status != 0 {
-		// Build SCSIError from status + sense.
 		se := &SCSIError{Status: result.Status}
 		if len(result.SenseData) > 0 {
 			sd, parseErr := scsi.ParseSense(result.SenseData)
@@ -66,403 +95,154 @@ func (s *Session) submitAndCheck(ctx context.Context, cmd session.Command) ([]by
 		}
 		return nil, se
 	}
-	// Check for residual overflow (target received more data than expected).
 	if result.Overflow {
 		return nil, &SCSIError{
 			Status:  result.Status,
 			Message: fmt.Sprintf("residual overflow: %d bytes", result.ResidualCount),
 		}
 	}
-	// Check for residual underflow (less data than expected).
-	// Underflow with Status==0 is acceptable (short read); the data reader
-	// already contains only the received bytes.
 	if result.Data != nil {
 		return io.ReadAll(result.Data)
 	}
 	return nil, nil
 }
 
-// ── SCSI commands ─────────────────────────────────────────────────────
+// ── Deprecated flat methods (forward to grouped APIs) ─────────────────
+//
+// These methods are kept for backward compatibility. Use the grouped
+// accessor methods (SCSI(), TMF(), Raw(), Protocol()) instead.
 
-// ReadBlocks reads blocks from the target. Uses READ(16) for full 64-bit LBA support.
+// Deprecated: Use sess.SCSI().ReadBlocks.
 func (s *Session) ReadBlocks(ctx context.Context, lun uint64, lba uint64, blocks uint32, blockSize uint32) ([]byte, error) {
-	cmd := scsi.Read16(lun, lba, blocks, blockSize)
-	return s.submitAndCheck(ctx, cmd)
+	return s.scsi.ReadBlocks(ctx, lun, lba, blocks, blockSize)
 }
 
-// WriteBlocks writes blocks to the target. Uses WRITE(16) for full 64-bit LBA support.
+// Deprecated: Use sess.SCSI().WriteBlocks.
 func (s *Session) WriteBlocks(ctx context.Context, lun uint64, lba uint64, blocks uint32, blockSize uint32, data []byte) error {
-	cmd := scsi.Write16(lun, lba, blocks, blockSize, bytes.NewReader(data))
-	_, err := s.submitAndCheck(ctx, cmd)
-	return err
+	return s.scsi.WriteBlocks(ctx, lun, lba, blocks, blockSize, data)
 }
 
-// Inquiry sends a standard INQUIRY command and returns the parsed response.
+// Deprecated: Use sess.SCSI().Inquiry.
 func (s *Session) Inquiry(ctx context.Context, lun uint64) (*InquiryData, error) {
-	cmd := scsi.Inquiry(lun, 255)
-	result, err := s.submitAndWait(ctx, cmd)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := scsi.ParseInquiry(result)
-	if err != nil {
-		return nil, wrapSCSIError(err)
-	}
-	return convertInquiry(resp), nil
+	return s.scsi.Inquiry(ctx, lun)
 }
 
-// ReadCapacity returns the capacity of the specified LUN.
-// It uses READ CAPACITY(16) for full 64-bit LBA support.
+// Deprecated: Use sess.SCSI().ReadCapacity.
 func (s *Session) ReadCapacity(ctx context.Context, lun uint64) (*Capacity, error) {
-	// Try ReadCapacity16 first (supports >2TB devices).
-	cmd := scsi.ReadCapacity16(lun, 32)
-	result, err := s.submitAndWait(ctx, cmd)
-	if err != nil {
-		return nil, err
-	}
-	resp16, err := scsi.ParseReadCapacity16(result)
-	if err == nil {
-		return convertCapacity16(resp16), nil
-	}
-	// Fallback to ReadCapacity10 — some targets (LIO with auto-ACLs)
-	// return CHECK CONDITION for SERVICE ACTION IN on non-zero LUNs.
-	cmd10 := scsi.ReadCapacity10(lun)
-	result10, err := s.submitAndWait(ctx, cmd10)
-	if err != nil {
-		return nil, err
-	}
-	resp10, err := scsi.ParseReadCapacity10(result10)
-	if err != nil {
-		return nil, wrapSCSIError(err)
-	}
-	return convertCapacity10(resp10), nil
+	return s.scsi.ReadCapacity(ctx, lun)
 }
 
-// TestUnitReady checks whether the specified LUN is ready.
+// Deprecated: Use sess.SCSI().TestUnitReady.
 func (s *Session) TestUnitReady(ctx context.Context, lun uint64) error {
-	cmd := scsi.TestUnitReady(lun)
-	_, err := s.submitAndCheck(ctx, cmd)
-	return err
+	return s.scsi.TestUnitReady(ctx, lun)
 }
 
-// RequestSense sends a REQUEST SENSE command and returns the parsed sense data.
+// Deprecated: Use sess.SCSI().RequestSense.
 func (s *Session) RequestSense(ctx context.Context, lun uint64) (*SenseInfo, error) {
-	cmd := scsi.RequestSense(lun, 252)
-	data, err := s.submitAndCheck(ctx, cmd)
-	if err != nil {
-		return nil, err
-	}
-	if len(data) == 0 {
-		return nil, nil
-	}
-	sd, err := scsi.ParseSense(data)
-	if err != nil {
-		return nil, err
-	}
-	return convertSense(sd), nil
+	return s.scsi.RequestSense(ctx, lun)
 }
 
-// ReportLuns returns all LUNs reported by the target.
+// Deprecated: Use sess.SCSI().ReportLuns.
 func (s *Session) ReportLuns(ctx context.Context) ([]uint64, error) {
-	cmd := scsi.ReportLuns(1024)
-	result, err := s.submitAndWait(ctx, cmd)
-	if err != nil {
-		return nil, err
-	}
-	luns, err := scsi.ParseReportLuns(result)
-	if err != nil {
-		return nil, wrapSCSIError(err)
-	}
-	return luns, nil
+	return s.scsi.ReportLuns(ctx)
 }
 
-// ModeSense6 sends a MODE SENSE(6) command and returns the raw mode page bytes.
+// Deprecated: Use sess.SCSI().ModeSense6.
 func (s *Session) ModeSense6(ctx context.Context, lun uint64, pageCode, subPageCode uint8) ([]byte, error) {
-	cmd := scsi.ModeSense6(lun, pageCode, subPageCode, 255)
-	return s.submitAndCheck(ctx, cmd)
+	return s.scsi.ModeSense6(ctx, lun, pageCode, subPageCode)
 }
 
-// ModeSense10 sends a MODE SENSE(10) command and returns the raw mode page bytes.
+// Deprecated: Use sess.SCSI().ModeSense10.
 func (s *Session) ModeSense10(ctx context.Context, lun uint64, pageCode, subPageCode uint8) ([]byte, error) {
-	cmd := scsi.ModeSense10(lun, pageCode, subPageCode, 1024)
-	return s.submitAndCheck(ctx, cmd)
+	return s.scsi.ModeSense10(ctx, lun, pageCode, subPageCode)
 }
 
-// SynchronizeCache flushes the target's volatile cache for the entire LUN.
+// Deprecated: Use sess.SCSI().SynchronizeCache.
 func (s *Session) SynchronizeCache(ctx context.Context, lun uint64) error {
-	cmd := scsi.SynchronizeCache16(lun, 0, 0)
-	_, err := s.submitAndCheck(ctx, cmd)
-	return err
+	return s.scsi.SynchronizeCache(ctx, lun)
 }
 
-// Verify requests the target to verify the specified LBA range.
+// Deprecated: Use sess.SCSI().Verify.
 func (s *Session) Verify(ctx context.Context, lun uint64, lba uint64, blocks uint32) error {
-	cmd := scsi.Verify16(lun, lba, blocks)
-	_, err := s.submitAndCheck(ctx, cmd)
-	return err
+	return s.scsi.Verify(ctx, lun, lba, blocks)
 }
 
-// WriteSame writes the same block of data to the specified LBA range.
+// Deprecated: Use sess.SCSI().WriteSame.
 func (s *Session) WriteSame(ctx context.Context, lun uint64, lba uint64, blocks uint32, blockSize uint32, data []byte) error {
-	cmd := scsi.WriteSame16(lun, lba, blocks, blockSize, bytes.NewReader(data))
-	_, err := s.submitAndCheck(ctx, cmd)
-	return err
+	return s.scsi.WriteSame(ctx, lun, lba, blocks, blockSize, data)
 }
 
-// Unmap deallocates the specified LBA ranges (thin provisioning).
+// Deprecated: Use sess.SCSI().Unmap.
 func (s *Session) Unmap(ctx context.Context, lun uint64, descriptors []UnmapBlockDescriptor) error {
-	internal := make([]scsi.UnmapBlockDescriptor, len(descriptors))
-	for i, d := range descriptors {
-		internal[i] = scsi.UnmapBlockDescriptor{LBA: d.LBA, BlockCount: d.Blocks}
-	}
-	cmd := scsi.Unmap(lun, internal)
-	_, err := s.submitAndCheck(ctx, cmd)
-	return err
+	return s.scsi.Unmap(ctx, lun, descriptors)
 }
 
-// CompareAndWrite performs an atomic read-compare-write operation.
-// data must contain 2*blocks*blockSize bytes: expected data followed by new data.
+// Deprecated: Use sess.SCSI().CompareAndWrite.
 func (s *Session) CompareAndWrite(ctx context.Context, lun uint64, lba uint64, blocks uint8, blockSize uint32, data []byte) error {
-	cmd := scsi.CompareAndWrite(lun, lba, blocks, blockSize, bytes.NewReader(data))
-	_, err := s.submitAndCheck(ctx, cmd)
-	return err
+	return s.scsi.CompareAndWrite(ctx, lun, lba, blocks, blockSize, data)
 }
 
-// StartStopUnit sends a START STOP UNIT command.
+// Deprecated: Use sess.SCSI().StartStopUnit.
 func (s *Session) StartStopUnit(ctx context.Context, lun uint64, powerCondition uint8, start, loadEject bool) error {
-	cmd := scsi.StartStopUnit(lun, powerCondition, start, loadEject)
-	_, err := s.submitAndCheck(ctx, cmd)
-	return err
+	return s.scsi.StartStopUnit(ctx, lun, powerCondition, start, loadEject)
 }
 
-// PersistReserveIn sends a PERSISTENT RESERVE IN command and returns the raw response.
+// Deprecated: Use sess.SCSI().PersistReserveIn.
 func (s *Session) PersistReserveIn(ctx context.Context, lun uint64, serviceAction uint8) ([]byte, error) {
-	cmd := scsi.PersistReserveIn(lun, serviceAction, 1024)
-	return s.submitAndCheck(ctx, cmd)
+	return s.scsi.PersistReserveIn(ctx, lun, serviceAction)
 }
 
-// PersistReserveOut sends a PERSISTENT RESERVE OUT command.
+// Deprecated: Use sess.SCSI().PersistReserveOut.
 func (s *Session) PersistReserveOut(ctx context.Context, lun uint64, serviceAction, scopeType uint8, key, saKey uint64) error {
-	cmd := scsi.PersistReserveOut(lun, serviceAction, scopeType, key, saKey)
-	_, err := s.submitAndCheck(ctx, cmd)
-	return err
+	return s.scsi.PersistReserveOut(ctx, lun, serviceAction, scopeType, key, saKey)
 }
 
-// ── iSCSI protocol operations ─────────────────────────────────────────
-//
-// These methods expose low-level RFC 7143 protocol mechanics. Most
-// callers should use [Session.Close] for session teardown. Use these
-// only when you need explicit control over iSCSI PDU exchanges.
-
-// Logout performs a graceful session logout. It waits for in-flight
-// commands to complete, then exchanges Logout/LogoutResp PDUs with the
-// target before shutting down. Per RFC 7143 Section 11.14. Most callers
-// should use [Session.Close] instead, which calls Logout internally.
+// Deprecated: Use sess.Protocol().Logout.
 func (s *Session) Logout(ctx context.Context) error {
-	return s.s.Logout(ctx)
+	return s.prot.Logout(ctx)
 }
 
-// SendExpStatSNConfirmation sends a NOP-Out that confirms ExpStatSN to the
-// target without expecting a response. Per RFC 7143 Section 11.18:
-// ITT=0xFFFFFFFF (no response), TTT=0xFFFFFFFF, Immediate=true.
-// CmdSN is carried but NOT advanced. This is an advanced operation; most
-// callers do not need it.
+// Deprecated: Use sess.Protocol().SendExpStatSNConfirmation.
 func (s *Session) SendExpStatSNConfirmation() error {
-	return s.s.SendExpStatSNConfirmation()
+	return s.prot.SendExpStatSNConfirmation()
 }
 
-// ── Task management (TMF) ─────────────────────────────────────────────
-
-// AbortTask aborts a single task identified by its initiator task tag.
+// Deprecated: Use sess.TMF().AbortTask.
 func (s *Session) AbortTask(ctx context.Context, taskTag uint32) (*TMFResult, error) {
-	r, err := s.s.AbortTask(ctx, taskTag)
-	if err != nil {
-		return nil, wrapTransportError("tmf", err)
-	}
-	return convertTMFResult(r), nil
+	return s.tmf.AbortTask(ctx, taskTag)
 }
 
-// AbortTaskSet aborts all tasks on the specified LUN.
+// Deprecated: Use sess.TMF().AbortTaskSet.
 func (s *Session) AbortTaskSet(ctx context.Context, lun uint64) (*TMFResult, error) {
-	r, err := s.s.AbortTaskSet(ctx, lun)
-	if err != nil {
-		return nil, wrapTransportError("tmf", err)
-	}
-	return convertTMFResult(r), nil
+	return s.tmf.AbortTaskSet(ctx, lun)
 }
 
-// ClearTaskSet clears all tasks on the specified LUN.
+// Deprecated: Use sess.TMF().ClearTaskSet.
 func (s *Session) ClearTaskSet(ctx context.Context, lun uint64) (*TMFResult, error) {
-	r, err := s.s.ClearTaskSet(ctx, lun)
-	if err != nil {
-		return nil, wrapTransportError("tmf", err)
-	}
-	return convertTMFResult(r), nil
+	return s.tmf.ClearTaskSet(ctx, lun)
 }
 
-// LUNReset resets the specified LUN.
+// Deprecated: Use sess.TMF().LUNReset.
 func (s *Session) LUNReset(ctx context.Context, lun uint64) (*TMFResult, error) {
-	r, err := s.s.LUNReset(ctx, lun)
-	if err != nil {
-		return nil, wrapTransportError("tmf", err)
-	}
-	return convertTMFResult(r), nil
+	return s.tmf.LUNReset(ctx, lun)
 }
 
-// TargetWarmReset performs a target warm reset.
+// Deprecated: Use sess.TMF().TargetWarmReset.
 func (s *Session) TargetWarmReset(ctx context.Context) (*TMFResult, error) {
-	r, err := s.s.TargetWarmReset(ctx)
-	if err != nil {
-		return nil, wrapTransportError("tmf", err)
-	}
-	return convertTMFResult(r), nil
+	return s.tmf.TargetWarmReset(ctx)
 }
 
-// TargetColdReset performs a target cold reset.
+// Deprecated: Use sess.TMF().TargetColdReset.
 func (s *Session) TargetColdReset(ctx context.Context) (*TMFResult, error) {
-	r, err := s.s.TargetColdReset(ctx)
-	if err != nil {
-		return nil, wrapTransportError("tmf", err)
-	}
-	return convertTMFResult(r), nil
+	return s.tmf.TargetColdReset(ctx)
 }
 
-// ── Raw CDB pass-through ──────────────────────────────────────────────
-
-// ExecuteOption configures raw CDB execution via Execute.
-type ExecuteOption func(*executeConfig)
-
-type executeConfig struct {
-	dataInLen uint32
-	dataOut   io.Reader
-	dataOutLen uint32
-}
-
-// WithDataIn configures Execute to expect a read response of up to allocLen bytes.
-func WithDataIn(allocLen uint32) ExecuteOption {
-	return func(c *executeConfig) {
-		c.dataInLen = allocLen
-	}
-}
-
-// WithDataOut configures Execute to send data with the command.
-func WithDataOut(r io.Reader, length uint32) ExecuteOption {
-	return func(c *executeConfig) {
-		c.dataOut = r
-		c.dataOutLen = length
-	}
-}
-
-// Execute sends a raw CDB to the target and returns the raw result.
-// This is the low-level pass-through for arbitrary SCSI commands.
-//
-// Unlike typed methods ([Session.ReadBlocks], [Session.Inquiry], etc.),
-// Execute does NOT interpret the SCSI status. A CHECK CONDITION response
-// is returned as RawResult.Status == 0x02 with raw sense bytes in
-// RawResult.SenseData — the caller is responsible for parsing and acting
-// on them. This is intentional: raw CDB callers (tape drivers, custom
-// device modules) need unfiltered access to status and sense data to
-// implement device-specific error handling.
+// Deprecated: Use sess.Raw().Execute.
 func (s *Session) Execute(ctx context.Context, lun uint64, cdb []byte, opts ...ExecuteOption) (*RawResult, error) {
-	cfg := &executeConfig{}
-	for _, o := range opts {
-		o(cfg)
-	}
-
-	if len(cdb) == 0 {
-		return nil, fmt.Errorf("iscsi execute: empty CDB")
-	}
-	if len(cdb) > 16 {
-		return nil, fmt.Errorf("iscsi execute: CDB length %d exceeds maximum 16 bytes (AHS Extended CDB not yet supported)", len(cdb))
-	}
-
-	var cmd session.Command
-	copy(cmd.CDB[:len(cdb)], cdb)
-	cmd.LUN = lun
-
-	if cfg.dataInLen > 0 {
-		cmd.Read = true
-		cmd.ExpectedDataTransferLen = cfg.dataInLen
-	}
-	if cfg.dataOut != nil {
-		cmd.Write = true
-		cmd.Data = cfg.dataOut
-		cmd.ExpectedDataTransferLen = cfg.dataOutLen
-	}
-
-	result, err := s.submitAndWait(ctx, cmd)
-	if err != nil {
-		return nil, err
-	}
-	if result.Err != nil {
-		return nil, wrapTransportError("execute", result.Err)
-	}
-
-	rr := &RawResult{
-		Status:    result.Status,
-		SenseData: result.SenseData,
-	}
-	if result.Data != nil {
-		rr.Data, err = io.ReadAll(result.Data)
-		if err != nil {
-			return nil, wrapTransportError("read", err)
-		}
-	}
-	return rr, nil
+	return s.execute(ctx, lun, cdb, opts...)
 }
 
-// StreamExecute sends a raw CDB to the target and returns a streaming result.
-// Unlike [Session.Execute], the response data is returned as an [io.Reader]
-// that streams Data-In PDUs as they arrive, with bounded memory usage
-// (~64KB) regardless of total transfer size. This makes it suitable for
-// any device type — block, tape, or otherwise.
-//
-// The returned [StreamResult.Data] must be fully consumed (or drained to
-// [io.Discard]), then [StreamResult.Wait] must be called to retrieve the
-// final SCSI status and sense data. Failing to consume Data before Wait
-// may cause Wait to block indefinitely due to flow-control backpressure.
-//
-// Like [Session.Execute], StreamExecute does NOT interpret the SCSI status.
-// CHECK CONDITION (0x02) is reported via [StreamResult.Wait] with raw sense
-// bytes — the caller must parse and handle them. See [Execute] for details.
-//
-// Write commands work identically to [Session.Execute] — the [io.Reader]
-// provided via [WithDataOut] is streamed through Data-Out PDUs without
-// intermediate buffering regardless of which method is used.
+// Deprecated: Use sess.Raw().StreamExecute.
 func (s *Session) StreamExecute(ctx context.Context, lun uint64, cdb []byte, opts ...ExecuteOption) (*StreamResult, error) {
-	cfg := &executeConfig{}
-	for _, o := range opts {
-		o(cfg)
-	}
-
-	if len(cdb) == 0 {
-		return nil, fmt.Errorf("iscsi execute: empty CDB")
-	}
-	if len(cdb) > 16 {
-		return nil, fmt.Errorf("iscsi execute: CDB length %d exceeds maximum 16 bytes (AHS Extended CDB not yet supported)", len(cdb))
-	}
-
-	var cmd session.Command
-	copy(cmd.CDB[:len(cdb)], cdb)
-	cmd.LUN = lun
-
-	if cfg.dataInLen > 0 {
-		cmd.Read = true
-		cmd.ExpectedDataTransferLen = cfg.dataInLen
-	}
-	if cfg.dataOut != nil {
-		cmd.Write = true
-		cmd.Data = cfg.dataOut
-		cmd.ExpectedDataTransferLen = cfg.dataOutLen
-	}
-
-	resultCh, dataReader, err := s.s.SubmitStreaming(ctx, cmd)
-	if err != nil {
-		return nil, wrapTransportError("submit", err)
-	}
-
-	return &StreamResult{
-		Data:     dataReader,
-		resultCh: resultCh,
-	}, nil
+	return s.streamExecute(ctx, lun, cdb, opts...)
 }
