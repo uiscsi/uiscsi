@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rkujawa/uiscsi/internal/login"
-	"github.com/rkujawa/uiscsi/internal/transport"
+	"github.com/uiscsi/uiscsi/internal/login"
+	"github.com/uiscsi/uiscsi/internal/transport"
 )
 
 // replaceConnection implements ERL 2 connection replacement per RFC 7143

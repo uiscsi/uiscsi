@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/rkujawa/uiscsi/internal/transport"
+	"github.com/uiscsi/uiscsi/internal/transport"
 )
 
 func TestPDUDirection_String(t *testing.T) {

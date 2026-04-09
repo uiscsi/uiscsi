@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/rkujawa/uiscsi/internal/serial"
+	"github.com/uiscsi/uiscsi/internal/serial"
 )
 
 // errWindowClosed is returned by acquire when the command window has been closed.

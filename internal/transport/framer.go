@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/rkujawa/uiscsi/internal/digest"
-	"github.com/rkujawa/uiscsi/internal/pdu"
+	"github.com/uiscsi/uiscsi/internal/digest"
+	"github.com/uiscsi/uiscsi/internal/pdu"
 )
 
 // RawPDU holds the raw bytes of an iSCSI PDU as read from or to be written

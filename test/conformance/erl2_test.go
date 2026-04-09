@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rkujawa/uiscsi"
-	"github.com/rkujawa/uiscsi/internal/pdu"
-	"github.com/rkujawa/uiscsi/internal/transport"
-	testutil "github.com/rkujawa/uiscsi/test"
-	"github.com/rkujawa/uiscsi/test/pducapture"
+	"github.com/uiscsi/uiscsi"
+	"github.com/uiscsi/uiscsi/internal/pdu"
+	"github.com/uiscsi/uiscsi/internal/transport"
+	testutil "github.com/uiscsi/uiscsi/test"
+	"github.com/uiscsi/uiscsi/test/pducapture"
 )
 
 // TestERL2_ConnectionReassignment verifies that after a TCP connection drop

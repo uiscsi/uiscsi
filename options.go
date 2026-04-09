@@ -8,9 +8,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/rkujawa/uiscsi/internal/login"
-	"github.com/rkujawa/uiscsi/internal/session"
-	"github.com/rkujawa/uiscsi/internal/transport"
+	"github.com/uiscsi/uiscsi/internal/login"
+	"github.com/uiscsi/uiscsi/internal/session"
+	"github.com/uiscsi/uiscsi/internal/transport"
 )
 
 // Option configures a Dial or Discover call via the functional options pattern.

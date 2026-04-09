@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/rkujawa/uiscsi/internal/pdu"
-	"github.com/rkujawa/uiscsi/internal/transport"
+	"github.com/uiscsi/uiscsi/internal/pdu"
+	"github.com/uiscsi/uiscsi/internal/transport"
 )
 
 // PDUDirection indicates whether a PDU was sent or received.

@@ -7,9 +7,9 @@ import (
 	"net"
 	"testing"
 
-	"github.com/rkujawa/uiscsi/internal/login"
-	"github.com/rkujawa/uiscsi/internal/pdu"
-	"github.com/rkujawa/uiscsi/internal/transport"
+	"github.com/uiscsi/uiscsi/internal/login"
+	"github.com/uiscsi/uiscsi/internal/pdu"
+	"github.com/uiscsi/uiscsi/internal/transport"
 )
 
 // newTestSessionWithParams creates a test session with custom NegotiatedParams.

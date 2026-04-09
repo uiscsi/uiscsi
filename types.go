@@ -6,8 +6,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/rkujawa/uiscsi/internal/scsi"
-	"github.com/rkujawa/uiscsi/internal/session"
+	"github.com/uiscsi/uiscsi/internal/scsi"
+	"github.com/uiscsi/uiscsi/internal/session"
 )
 
 // DecodeLUN extracts the flat LUN number from an 8-byte SAM LUN encoding

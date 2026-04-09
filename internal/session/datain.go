@@ -7,8 +7,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/rkujawa/uiscsi/internal/pdu"
-	"github.com/rkujawa/uiscsi/internal/transport"
+	"github.com/uiscsi/uiscsi/internal/pdu"
+	"github.com/uiscsi/uiscsi/internal/transport"
 )
 
 // task represents an in-flight SCSI command. It correlates request ITT

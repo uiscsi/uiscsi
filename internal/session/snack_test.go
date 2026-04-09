@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rkujawa/uiscsi/internal/pdu"
-	"github.com/rkujawa/uiscsi/internal/transport"
+	"github.com/uiscsi/uiscsi/internal/pdu"
+	"github.com/uiscsi/uiscsi/internal/transport"
 )
 
 func TestSNACK(t *testing.T) {

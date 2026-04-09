@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/rkujawa/uiscsi"
-	"github.com/rkujawa/uiscsi/internal/pdu"
-	"github.com/rkujawa/uiscsi/test/pducapture"
+	"github.com/uiscsi/uiscsi"
+	"github.com/uiscsi/uiscsi/internal/pdu"
+	"github.com/uiscsi/uiscsi/test/pducapture"
 )
 
 // marshalPDU is a test helper that marshals a PDU into a byte slice.

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rkujawa/uiscsi/internal/pdu"
+	"github.com/uiscsi/uiscsi/internal/pdu"
 )
 
 func TestWritePump_BasicWrite(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"io"
 
-	"github.com/rkujawa/uiscsi/internal/session"
+	"github.com/uiscsi/uiscsi/internal/session"
 )
 
 // Read10 returns a READ(10) command (opcode 0x28) for reading blocks at

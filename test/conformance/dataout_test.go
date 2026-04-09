@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rkujawa/uiscsi"
-	"github.com/rkujawa/uiscsi/internal/pdu"
-	testutil "github.com/rkujawa/uiscsi/test"
-	"github.com/rkujawa/uiscsi/test/pducapture"
+	"github.com/uiscsi/uiscsi"
+	"github.com/uiscsi/uiscsi/internal/pdu"
+	testutil "github.com/uiscsi/uiscsi/test"
+	"github.com/uiscsi/uiscsi/test/pducapture"
 )
 
 // TestDataOut_DataSN verifies that Data-Out DataSN starts at 0 and increments

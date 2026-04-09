@@ -6,7 +6,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/rkujawa/uiscsi/internal/session"
+	"github.com/uiscsi/uiscsi/internal/session"
 )
 
 func TestPersistReserveIn(t *testing.T) {

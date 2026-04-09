@@ -7,7 +7,7 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/rkujawa/uiscsi/internal/pdu"
+	"github.com/uiscsi/uiscsi/internal/pdu"
 )
 
 // PDU hook direction constants. These live in the transport package to

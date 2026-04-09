@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/rkujawa/uiscsi/internal/session"
+	"github.com/uiscsi/uiscsi/internal/session"
 )
 
 // ModeSense6Response holds the parsed MODE SENSE (6) response.

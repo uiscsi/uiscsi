@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"io"
 
-	"github.com/rkujawa/uiscsi/internal/session"
+	"github.com/uiscsi/uiscsi/internal/session"
 )
 
 // SynchronizeCache10 returns a SYNCHRONIZE CACHE(10) command (opcode 0x35).

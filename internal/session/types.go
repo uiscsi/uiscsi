@@ -11,8 +11,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/rkujawa/uiscsi/internal/login"
-	"github.com/rkujawa/uiscsi/internal/transport"
+	"github.com/uiscsi/uiscsi/internal/login"
+	"github.com/uiscsi/uiscsi/internal/transport"
 )
 
 // Command represents a SCSI command to be submitted via the session.

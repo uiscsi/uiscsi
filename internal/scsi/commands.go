@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/rkujawa/uiscsi/internal/pdu"
-	"github.com/rkujawa/uiscsi/internal/session"
+	"github.com/uiscsi/uiscsi/internal/pdu"
+	"github.com/uiscsi/uiscsi/internal/session"
 )
 
 // TestUnitReady returns a TEST UNIT READY command (opcode 0x00).

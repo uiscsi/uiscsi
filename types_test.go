@@ -3,7 +3,7 @@ package uiscsi
 import (
 	"testing"
 
-	"github.com/rkujawa/uiscsi/internal/scsi"
+	"github.com/uiscsi/uiscsi/internal/scsi"
 )
 
 func TestConvertSensePropagatesFilemarkEOMILI(t *testing.T) {

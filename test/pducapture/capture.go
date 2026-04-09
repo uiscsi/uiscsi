@@ -7,8 +7,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/rkujawa/uiscsi"
-	"github.com/rkujawa/uiscsi/internal/pdu"
+	"github.com/uiscsi/uiscsi"
+	"github.com/uiscsi/uiscsi/internal/pdu"
 )
 
 // CapturedPDU represents a single captured PDU with direction, decoded type,

@@ -5,7 +5,7 @@ package uiscsi
 import (
 	"fmt"
 
-	"github.com/rkujawa/uiscsi/internal/scsi"
+	"github.com/uiscsi/uiscsi/internal/scsi"
 )
 
 // ParseSenseData parses raw SCSI sense bytes (as returned in

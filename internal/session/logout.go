@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rkujawa/uiscsi/internal/pdu"
-	"github.com/rkujawa/uiscsi/internal/transport"
+	"github.com/uiscsi/uiscsi/internal/pdu"
+	"github.com/uiscsi/uiscsi/internal/transport"
 )
 
 // logout performs the Logout PDU exchange per RFC 7143 Section 11.14/11.15.

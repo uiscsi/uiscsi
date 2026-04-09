@@ -6,7 +6,7 @@ package transport
 import (
 	"sync"
 
-	"github.com/rkujawa/uiscsi/internal/pdu"
+	"github.com/uiscsi/uiscsi/internal/pdu"
 )
 
 // bhsPool reuses 48-byte BHS buffers to reduce GC pressure during PDU framing.

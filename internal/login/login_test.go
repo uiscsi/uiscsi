@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rkujawa/uiscsi/internal/pdu"
-	"github.com/rkujawa/uiscsi/internal/transport"
+	"github.com/uiscsi/uiscsi/internal/pdu"
+	"github.com/uiscsi/uiscsi/internal/transport"
 )
 
 // captureHandler is a slog.Handler that records all log entries for test assertions.

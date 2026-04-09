@@ -70,9 +70,9 @@ import (
 	"errors"
 	"net"
 
-	"github.com/rkujawa/uiscsi/internal/login"
-	"github.com/rkujawa/uiscsi/internal/session"
-	"github.com/rkujawa/uiscsi/internal/transport"
+	"github.com/uiscsi/uiscsi/internal/login"
+	"github.com/uiscsi/uiscsi/internal/session"
+	"github.com/uiscsi/uiscsi/internal/transport"
 )
 
 // normalizePortal ensures addr has an explicit port. If no port is present,

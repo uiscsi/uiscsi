@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 
-	"github.com/rkujawa/uiscsi/internal/scsi"
-	"github.com/rkujawa/uiscsi/internal/session"
+	"github.com/uiscsi/uiscsi/internal/scsi"
+	"github.com/uiscsi/uiscsi/internal/session"
 )
 
 // SCSIOps provides typed SCSI command methods. Obtain via [Session.SCSI].

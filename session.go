@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/rkujawa/uiscsi/internal/scsi"
-	"github.com/rkujawa/uiscsi/internal/session"
+	"github.com/uiscsi/uiscsi/internal/scsi"
+	"github.com/uiscsi/uiscsi/internal/session"
 )
 
 // Session represents an active iSCSI session. It wraps the internal session

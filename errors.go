@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/rkujawa/uiscsi/internal/login"
-	"github.com/rkujawa/uiscsi/internal/scsi"
+	"github.com/uiscsi/uiscsi/internal/login"
+	"github.com/uiscsi/uiscsi/internal/scsi"
 )
 
 // SCSIError represents a SCSI command failure with status and optional sense data.

@@ -12,7 +12,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/rkujawa/uiscsi"
+	"github.com/uiscsi/uiscsi"
 )
 
 func main() {

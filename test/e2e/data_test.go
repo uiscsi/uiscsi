@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rkujawa/uiscsi"
-	"github.com/rkujawa/uiscsi/test/lio"
+	"github.com/uiscsi/uiscsi"
+	"github.com/uiscsi/uiscsi/test/lio"
 )
 
 const initiatorIQN = "iqn.2026-04.com.uiscsi.e2e:initiator"

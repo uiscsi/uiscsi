@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rkujawa/uiscsi/internal/login"
-	"github.com/rkujawa/uiscsi/internal/scsi"
+	"github.com/uiscsi/uiscsi/internal/login"
+	"github.com/uiscsi/uiscsi/internal/scsi"
 )
 
 func TestSCSIError_Error(t *testing.T) {

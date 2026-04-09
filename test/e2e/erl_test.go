@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rkujawa/uiscsi"
-	"github.com/rkujawa/uiscsi/test/lio"
+	"github.com/uiscsi/uiscsi"
+	"github.com/uiscsi/uiscsi/test/lio"
 )
 
 // setTargetParam writes a value to a LIO target parameter via configfs.

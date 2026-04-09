@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rkujawa/uiscsi"
-	"github.com/rkujawa/uiscsi/test/lio"
+	"github.com/uiscsi/uiscsi"
+	"github.com/uiscsi/uiscsi/test/lio"
 )
 
 // TestSCSIError_OutOfRangeLBA verifies that writing to an LBA beyond the LUN

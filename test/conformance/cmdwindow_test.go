@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rkujawa/uiscsi"
-	"github.com/rkujawa/uiscsi/internal/pdu"
-	testutil "github.com/rkujawa/uiscsi/test"
-	"github.com/rkujawa/uiscsi/test/pducapture"
+	"github.com/uiscsi/uiscsi"
+	"github.com/uiscsi/uiscsi/internal/pdu"
+	testutil "github.com/uiscsi/uiscsi/test"
+	"github.com/uiscsi/uiscsi/test/pducapture"
 )
 
 // TestCmdWindow_ZeroWindow verifies that the initiator blocks new commands

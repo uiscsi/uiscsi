@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rkujawa/uiscsi"
-	testutil "github.com/rkujawa/uiscsi/test"
-	"github.com/rkujawa/uiscsi/internal/login"
-	"github.com/rkujawa/uiscsi/internal/pdu"
-	"github.com/rkujawa/uiscsi/internal/transport"
+	"github.com/uiscsi/uiscsi"
+	testutil "github.com/uiscsi/uiscsi/test"
+	"github.com/uiscsi/uiscsi/internal/login"
+	"github.com/uiscsi/uiscsi/internal/pdu"
+	"github.com/uiscsi/uiscsi/internal/transport"
 )
 
 // setupTarget creates a MockTarget with login and logout handlers.

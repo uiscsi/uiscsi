@@ -38,7 +38,7 @@ It supports CHAP and mutual CHAP authentication, header and data digest negotiat
 ## Quick Start
 
 ```
-go get github.com/rkujawa/uiscsi
+go get github.com/uiscsi/uiscsi
 ```
 
 ```go
@@ -49,7 +49,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/rkujawa/uiscsi"
+    "github.com/uiscsi/uiscsi"
 )
 
 func main() {
@@ -74,7 +74,7 @@ func main() {
 
 ## API Reference
 
-Full documentation is available on [pkg.go.dev](https://pkg.go.dev/github.com/rkujawa/uiscsi).
+Full documentation is available on [pkg.go.dev](https://pkg.go.dev/github.com/uiscsi/uiscsi).
 
 ### Session Accessors
 

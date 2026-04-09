@@ -5,7 +5,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/rkujawa/uiscsi/internal/pdu"
+	"github.com/uiscsi/uiscsi/internal/pdu"
 )
 
 func TestTaskSingleDataIn(t *testing.T) {

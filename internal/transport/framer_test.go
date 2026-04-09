@@ -8,8 +8,8 @@ import (
 	"net"
 	"testing"
 
-	"github.com/rkujawa/uiscsi/internal/digest"
-	"github.com/rkujawa/uiscsi/internal/pdu"
+	"github.com/uiscsi/uiscsi/internal/digest"
+	"github.com/uiscsi/uiscsi/internal/pdu"
 )
 
 // makeBHS constructs a minimal 48-byte BHS with the given opcode, totalAHSLength (in 4-byte words),

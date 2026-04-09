@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/rkujawa/uiscsi"
+	"github.com/uiscsi/uiscsi"
 )
 
 func ExampleDial() {

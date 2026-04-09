@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rkujawa/uiscsi"
-	"github.com/rkujawa/uiscsi/test/lio"
+	"github.com/uiscsi/uiscsi"
+	"github.com/uiscsi/uiscsi/test/lio"
 )
 
 // TestDigests verifies CRC32C header and data digest negotiation against a

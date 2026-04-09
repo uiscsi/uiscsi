@@ -9,11 +9,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rkujawa/uiscsi/internal/digest"
-	"github.com/rkujawa/uiscsi/internal/login"
-	"github.com/rkujawa/uiscsi/internal/pdu"
-	"github.com/rkujawa/uiscsi/internal/serial"
-	"github.com/rkujawa/uiscsi/internal/transport"
+	"github.com/uiscsi/uiscsi/internal/digest"
+	"github.com/uiscsi/uiscsi/internal/login"
+	"github.com/uiscsi/uiscsi/internal/pdu"
+	"github.com/uiscsi/uiscsi/internal/serial"
+	"github.com/uiscsi/uiscsi/internal/transport"
 )
 
 // ErrRetryNotPossible indicates a write command cannot be retried after

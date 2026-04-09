@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/rkujawa/uiscsi/internal/session"
+	"github.com/uiscsi/uiscsi/internal/session"
 )
 
 // RawOps provides raw CDB pass-through methods. Obtain via [Session.Raw].

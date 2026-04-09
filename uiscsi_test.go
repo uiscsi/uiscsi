@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rkujawa/uiscsi"
+	"github.com/uiscsi/uiscsi"
 )
 
 func TestSCSIError_Error_External(t *testing.T) {

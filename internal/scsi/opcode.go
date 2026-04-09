@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/rkujawa/uiscsi/internal/session"
+	"github.com/uiscsi/uiscsi/internal/session"
 )
 
 // SCSI operation codes per SPC-4 and SBC-3.

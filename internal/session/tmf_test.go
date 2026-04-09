@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rkujawa/uiscsi/internal/pdu"
-	"github.com/rkujawa/uiscsi/internal/transport"
+	"github.com/uiscsi/uiscsi/internal/pdu"
+	"github.com/uiscsi/uiscsi/internal/transport"
 )
 
 // readTaskMgmtReqPDU reads and decodes a TaskMgmtReq PDU from the target conn.

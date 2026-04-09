@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rkujawa/uiscsi"
-	testutil "github.com/rkujawa/uiscsi/test"
+	"github.com/uiscsi/uiscsi"
+	testutil "github.com/uiscsi/uiscsi/test"
 )
 
 // setupFullFeatureTarget creates a MockTarget configured with login, logout,
