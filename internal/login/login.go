@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/uiscsi/uiscsi/internal/pdu"
 	"github.com/uiscsi/uiscsi/internal/transport"
@@ -183,6 +184,13 @@ func Login(ctx context.Context, tc *transport.Conn, opts ...LoginOption) (*Negot
 	if err := ls.run(ctx); err != nil {
 		return nil, err
 	}
+
+	// Clear deadline set during login so the session layer starts with
+	// an unbounded connection. Login sets per-PDU deadlines from context;
+	// leaving them leaks into ReadPump and causes spurious i/o timeouts
+	// after reconnect (the reconnect context has a 10s timeout whose
+	// deadline persists on the TCP connection).
+	ls.conn.SetDeadline(time.Time{})
 
 	// Configure transport after successful login (Pitfall 6: only after login).
 	tc.SetDigests(ls.params.HeaderDigest, ls.params.DataDigest)

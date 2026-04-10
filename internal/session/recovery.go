@@ -180,7 +180,7 @@ func (s *Session) reconnect(cause error) {
 	// Step 4: Replace session internals with new connection.
 	newCtx, newCancel := context.WithCancel(context.Background())
 	newWriteCh := make(chan *transport.RawPDU, 64)
-	newUnsolCh := make(chan *transport.RawPDU, 16)
+	newUnsolCh := make(chan *transport.RawPDU, 64)
 
 	s.mu.Lock()
 	s.conn = newConn

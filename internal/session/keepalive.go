@@ -149,6 +149,8 @@ func (s *Session) handleUnsolicitedNOPIn(raw *transport.RawPDU) {
 
 		select {
 		case s.writeCh <- resp:
+			s.cfg.logger.Debug("session: responded to target NOP-In ping",
+				"ttt", fmt.Sprintf("0x%08x", nopin.TargetTransferTag))
 		default:
 			s.cfg.logger.Warn("session: write channel full, dropping NOP-Out response")
 		}
