@@ -145,7 +145,9 @@ func (s *Session) replaceConnection(cause error) error {
 		// TMF TASK REASSIGN confirmed -- NOW safe to unregister old ITT.
 		s.router.Unregister(itt)
 
-		// Update task with new ITT.
+		// Update task with new ITT. Safe to modify tk.itt without task-level
+		// synchronization: the old taskLoop has exited (old pduCh was closed
+		// above) and the new taskLoop has not started yet.
 		s.mu.Lock()
 		tk.itt = newITT
 		s.tasks[newITT] = tk
