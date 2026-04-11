@@ -31,10 +31,7 @@ func TestStringSCSICommand(t *testing.T) {
 	assertContains(t, s, "R:true")
 	assertContains(t, s, "W:false")
 	assertContains(t, s, "CDB:28:00:00:00:00:01:00:00")
-	// CDB should be truncated to 8 bytes
-	if strings.Count(s, ":") > 10 { // Allow some colons from other fields
-		// Verify CDB doesn't show all 16 bytes
-	}
+	// CDB should be truncated to 8 bytes in the String() output.
 }
 
 func TestStringTaskMgmtReq(t *testing.T) {

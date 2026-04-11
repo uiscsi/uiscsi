@@ -34,15 +34,28 @@ const (
 	largeBufSize  = 1 << 24 // <= 16MB: RFC 7143 max data segment length
 )
 
+// SA6002: store *[]byte (pointer to slice header) in sync.Pool instead of
+// []byte (slice header value). A []byte is a 3-word struct; passing it to
+// Pool.Put boxes it into an interface, causing an allocation on every Put and
+// defeating the pool's purpose. Storing a pointer avoids this allocation.
 var (
 	smallPool = sync.Pool{
-		New: func() any { return make([]byte, smallBufSize) },
+		New: func() any {
+			b := make([]byte, smallBufSize)
+			return &b
+		},
 	}
 	mediumPool = sync.Pool{
-		New: func() any { return make([]byte, mediumBufSize) },
+		New: func() any {
+			b := make([]byte, mediumBufSize)
+			return &b
+		},
 	}
 	largePool = sync.Pool{
-		New: func() any { return make([]byte, largeBufSize) },
+		New: func() any {
+			b := make([]byte, largeBufSize)
+			return &b
+		},
 	}
 )
 
@@ -52,14 +65,14 @@ var (
 func GetBuffer(size int) []byte {
 	switch {
 	case size <= smallBufSize:
-		buf := smallPool.Get().([]byte)
-		return buf[:size]
+		bp := smallPool.Get().(*[]byte)
+		return (*bp)[:size]
 	case size <= mediumBufSize:
-		buf := mediumPool.Get().([]byte)
-		return buf[:size]
+		bp := mediumPool.Get().(*[]byte)
+		return (*bp)[:size]
 	case size <= largeBufSize:
-		buf := largePool.Get().([]byte)
-		return buf[:size]
+		bp := largePool.Get().(*[]byte)
+		return (*bp)[:size]
 	default:
 		// Oversized: allocate directly, not pooled.
 		return make([]byte, size)
@@ -70,13 +83,14 @@ func GetBuffer(size int) []byte {
 // Buffers larger than the largest pool class are not returned.
 func PutBuffer(b []byte) {
 	c := cap(b)
+	b = b[:c]
 	switch {
 	case c >= largeBufSize:
-		largePool.Put(b[:c])
+		largePool.Put(&b)
 	case c >= mediumBufSize:
-		mediumPool.Put(b[:c])
+		mediumPool.Put(&b)
 	case c >= smallBufSize:
-		smallPool.Put(b[:c])
+		smallPool.Put(&b)
 	// Smaller than smallest pool class: drop it.
 	}
 }

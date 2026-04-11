@@ -76,7 +76,7 @@ func TestSCSICommand_ImmediateDataMatrix(t *testing.T) {
 		setup := newWriteTestSetup(t, negCfg)
 
 		setup.Target.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-			expCmdSN, maxCmdSN := setup.Target.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+			expCmdSN, _ := setup.Target.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
 			// Send R2T for full EDTL, consume Data-Out, send response.
 			_, maxCmdSN, err := sendR2TAndConsume(tc, setup.Target, cmd, 0x00000001, 0, cmd.ExpectedDataTransferLength)
 			if err != nil {
@@ -129,7 +129,7 @@ func TestSCSICommand_ImmediateDataMatrix(t *testing.T) {
 		setup := newWriteTestSetup(t, negCfg)
 
 		setup.Target.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-			expCmdSN, maxCmdSN := setup.Target.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+			expCmdSN, _ := setup.Target.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
 			// Send R2T for full EDTL, consume Data-Out, send response.
 			_, maxCmdSN, err := sendR2TAndConsume(tc, setup.Target, cmd, 0x00000001, 0, cmd.ExpectedDataTransferLength)
 			if err != nil {
