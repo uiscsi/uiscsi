@@ -940,6 +940,180 @@ func TestSubmitContextCancel(t *testing.T) {
 	}
 }
 
+// TestDrainNoTasks verifies that Drain() on a session with no in-flight tasks
+// returns nil immediately without blocking.
+func TestDrainNoTasks(t *testing.T) {
+	sess, _ := newTestSession(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	if err := sess.Drain(ctx); err != nil {
+		t.Fatalf("Drain with no tasks: got %v, want nil", err)
+	}
+}
+
+// TestDrainWaitsForTasks verifies that Drain() blocks until all in-flight
+// tasks complete, then returns nil.
+func TestDrainWaitsForTasks(t *testing.T) {
+	sess, targetConn := newTestSession(t)
+
+	// Submit 3 commands without getting responses yet.
+	type submitted struct {
+		resultCh <-chan Result
+		itt      uint32
+	}
+	var cmds []submitted
+
+	for i := range 3 {
+		cmd := Command{}
+		cmd.CDB[0] = byte(i + 1)
+		resultCh, err := sess.Submit(context.Background(), cmd)
+		if err != nil {
+			t.Fatalf("Submit %d: %v", i, err)
+		}
+		scsiCmd := readSCSICommandPDU(t, targetConn)
+		cmds = append(cmds, submitted{resultCh: resultCh, itt: scsiCmd.InitiatorTaskTag})
+	}
+
+	// Start Drain — it should block because tasks are in-flight.
+	drainDone := make(chan error, 1)
+	drainCtx, drainCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer drainCancel()
+	go func() {
+		drainDone <- sess.Drain(drainCtx)
+	}()
+
+	// Send responses for all 3 tasks with increasing StatSN.
+	for i, c := range cmds {
+		writeSCSIResponsePDU(t, targetConn, &pdu.SCSIResponse{
+			Header:   pdu.Header{InitiatorTaskTag: c.itt},
+			Status:   0x00,
+			StatSN:   uint32(1 + i),
+			ExpCmdSN: uint32(2 + i),
+			MaxCmdSN: 10,
+		})
+		result := <-c.resultCh
+		if result.Err != nil {
+			t.Fatalf("task %d error: %v", i, result.Err)
+		}
+	}
+
+	// Drain should return nil now.
+	select {
+	case err := <-drainDone:
+		if err != nil {
+			t.Fatalf("Drain after all tasks complete: got %v, want nil", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("Drain did not return after all tasks completed")
+	}
+}
+
+// TestDrainTimeout verifies that Drain() returns context.DeadlineExceeded when
+// the context expires before all tasks complete.
+func TestDrainTimeout(t *testing.T) {
+	sess, _ := newTestSession(t) // no responses from target
+
+	cmd := Command{}
+	cmd.CDB[0] = 0x00
+	_, err := sess.Submit(context.Background(), cmd)
+	if err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+
+	// Use a short timeout — the mock target won't respond.
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	if err := sess.Drain(ctx); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Drain with timeout: got %v, want context.DeadlineExceeded", err)
+	}
+
+	// After timeout, draining flag should be cleared so a subsequent Close succeeds.
+	// Close() is called by t.Cleanup in newTestSession; just verify it doesn't hang.
+}
+
+// TestDrainRejectsNewSubmit verifies that new Submit calls return ErrSessionDraining
+// while a Drain is in progress.
+func TestDrainRejectsNewSubmit(t *testing.T) {
+	sess, _ := newTestSession(t) // no target responses
+
+	// Submit a command to make Drain block.
+	cmd := Command{}
+	cmd.CDB[0] = 0x00
+	_, err := sess.Submit(context.Background(), cmd)
+	if err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+
+	// Start a long Drain that will block.
+	drainCtx, drainCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer drainCancel()
+
+	drainStarted := make(chan struct{})
+	drainDone := make(chan error, 1)
+	go func() {
+		// Signal that Drain goroutine is about to block.
+		close(drainStarted)
+		drainDone <- sess.Drain(drainCtx)
+	}()
+	<-drainStarted
+
+	// Give Drain goroutine time to start and set s.draining.
+	time.Sleep(10 * time.Millisecond)
+
+	// A new Submit must be rejected.
+	cmd2 := Command{}
+	cmd2.CDB[0] = 0x01
+	_, err = sess.Submit(context.Background(), cmd2)
+	if !errors.Is(err, ErrSessionDraining) {
+		t.Fatalf("Submit during Drain: got %v, want ErrSessionDraining", err)
+	}
+
+	// Cancel drain so the goroutine exits.
+	drainCancel()
+	<-drainDone
+}
+
+// TestDrainConcurrentCalls verifies that concurrent Drain() calls are safe:
+// the second call returns ErrSessionDraining; no panic or deadlock.
+func TestDrainConcurrentCalls(t *testing.T) {
+	sess, _ := newTestSession(t) // no target responses
+
+	// Submit a command to make Drain block.
+	cmd := Command{}
+	cmd.CDB[0] = 0x00
+	_, err := sess.Submit(context.Background(), cmd)
+	if err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+
+	drainCtx, drainCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer drainCancel()
+
+	// First Drain — will block (task in flight, no response).
+	drain1Done := make(chan error, 1)
+	go func() {
+		drain1Done <- sess.Drain(drainCtx)
+	}()
+
+	// Give the first Drain goroutine time to set s.draining.
+	time.Sleep(10 * time.Millisecond)
+
+	// Second concurrent Drain must return ErrSessionDraining immediately.
+	ctx2, cancel2 := context.WithTimeout(context.Background(), time.Second)
+	defer cancel2()
+	err2 := sess.Drain(ctx2)
+	if !errors.Is(err2, ErrSessionDraining) {
+		t.Fatalf("concurrent Drain: got %v, want ErrSessionDraining", err2)
+	}
+
+	// Cancel first Drain.
+	drainCancel()
+	<-drain1Done
+}
+
 // TestCloseDetachesAllPumps verifies SESS-07: Close() returns only after all
 // pump goroutines have exited. goleak in TestMain enforces the no-leak invariant.
 func TestCloseDetachesAllPumps(t *testing.T) {
