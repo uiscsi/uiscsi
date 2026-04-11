@@ -110,9 +110,17 @@ func (s *Session) handleTargetRequestedLogout(evt AsyncEvent) {
 
 	// DefaultTime2Wait is the delay before logout CAN start.
 	// Only wait if it fits within the deadline.
+	// Use a context-aware timer so Close() can interrupt the wait and
+	// so testing/synctest fake time virtualizes the delay (SESS-05).
 	waitDuration := time.Duration(s.params.DefaultTime2Wait) * time.Second
 	if waitDuration > 0 && waitDuration < deadline {
-		time.Sleep(waitDuration)
+		timer := time.NewTimer(waitDuration)
+		select {
+		case <-timer.C:
+		case <-s.closed:
+			timer.Stop()
+			return // session closed during wait
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), deadline)
