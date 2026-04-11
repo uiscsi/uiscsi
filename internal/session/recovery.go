@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/uiscsi/uiscsi/internal/login"
-	"github.com/uiscsi/uiscsi/internal/pdu"
 	"github.com/uiscsi/uiscsi/internal/transport"
 )
 
@@ -330,32 +329,10 @@ func (s *Session) retryTasks(ctx context.Context, tasks map[uint32]*task) {
 
 		// Build fresh SCSICommand PDU with new sequence numbers.
 		cmd := tk.cmd
-		scsiCmd := &pdu.SCSICommand{
-			Header: pdu.Header{
-				Final:            true,
-				InitiatorTaskTag: newITT,
-				DataSegmentLen:   uint32(len(immediateData)),
-			},
-			Read:                       cmd.Read,
-			Write:                      cmd.Write,
-			Attr:                       cmd.TaskAttributes,
-			ExpectedDataTransferLength: cmd.ExpectedDataTransferLen,
-			CmdSN:                      cmdSN,
-			ExpStatSN:                  s.getExpStatSN(),
-			CDB:                        cmd.CDB,
-			ImmediateData:              immediateData,
-		}
-		scsiCmd.LUN = pdu.EncodeSAMLUN(cmd.LUN)
-
-		bhs, encErr := scsiCmd.MarshalBHS()
+		raw, encErr := buildSCSICommandPDU(cmd, newITT, cmdSN, s.getExpStatSN(), immediateData)
 		if encErr != nil {
 			tk.cancel(fmt.Errorf("session: retry encode SCSICommand: %w", encErr))
 			continue
-		}
-
-		raw := &transport.RawPDU{BHS: bhs}
-		if len(immediateData) > 0 {
-			raw.DataSegment = immediateData
 		}
 
 		s.mu.Lock()

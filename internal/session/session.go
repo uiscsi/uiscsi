@@ -186,38 +186,13 @@ func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error
 	}
 
 	// Build SCSICommand PDU.
-	scsiCmd := &pdu.SCSICommand{
-		Header: pdu.Header{
-			Final:            true,
-			InitiatorTaskTag: itt,
-			DataSegmentLen:   uint32(len(immediateData)),
-		},
-		Read:                       cmd.Read,
-		Write:                      cmd.Write,
-		Attr:                       cmd.TaskAttributes,
-		ExpectedDataTransferLength: cmd.ExpectedDataTransferLen,
-		CmdSN:                      cmdSN,
-		ExpStatSN:                  expStatSN,
-		CDB:                        cmd.CDB,
-		ImmediateData:              immediateData,
-	}
-
-	// Set LUN in header.
-	scsiCmd.LUN = pdu.EncodeSAMLUN(cmd.LUN)
-
-	// Encode to wire format.
-	bhs, encErr := scsiCmd.MarshalBHS()
+	raw, encErr := buildSCSICommandPDU(cmd, itt, cmdSN, expStatSN, immediateData)
 	if encErr != nil {
 		s.router.Unregister(itt)
 		s.mu.Lock()
 		delete(s.tasks, itt)
 		s.mu.Unlock()
 		return nil, fmt.Errorf("session: encode SCSICommand (itt=0x%08x cmd_sn=%d): %w", itt, cmdSN, encErr)
-	}
-
-	raw := &transport.RawPDU{BHS: bhs}
-	if len(immediateData) > 0 {
-		raw.DataSegment = immediateData
 	}
 
 	// Compute digests before sending.
@@ -326,35 +301,13 @@ func (s *Session) SubmitStreaming(ctx context.Context, cmd Command) (<-chan Resu
 		tk.bytesSent = uint32(n)
 	}
 
-	scsiCmd := &pdu.SCSICommand{
-		Header: pdu.Header{
-			Final:            true,
-			InitiatorTaskTag: itt,
-			DataSegmentLen:   uint32(len(immediateData)),
-		},
-		Read:                       cmd.Read,
-		Write:                      cmd.Write,
-		Attr:                       cmd.TaskAttributes,
-		ExpectedDataTransferLength: cmd.ExpectedDataTransferLen,
-		CmdSN:                      cmdSN,
-		ExpStatSN:                  expStatSN,
-		CDB:                        cmd.CDB,
-		ImmediateData:              immediateData,
-	}
-	scsiCmd.LUN = pdu.EncodeSAMLUN(cmd.LUN)
-
-	bhs, encErr := scsiCmd.MarshalBHS()
+	raw, encErr := buildSCSICommandPDU(cmd, itt, cmdSN, expStatSN, immediateData)
 	if encErr != nil {
 		s.router.Unregister(itt)
 		s.mu.Lock()
 		delete(s.tasks, itt)
 		s.mu.Unlock()
 		return nil, nil, fmt.Errorf("session: encode SCSICommand (itt=0x%08x cmd_sn=%d): %w", itt, cmdSN, encErr)
-	}
-
-	raw := &transport.RawPDU{BHS: bhs}
-	if len(immediateData) > 0 {
-		raw.DataSegment = immediateData
 	}
 	s.stampDigests(raw)
 
@@ -812,6 +765,43 @@ func (s *Session) taskLoop(tk *task, pduCh <-chan *transport.RawPDU) {
 	}
 }
 
+// buildSCSICommandPDU constructs a SCSICommand PDU ready for wire encoding.
+// immediateData may be nil for commands with no immediate data payload.
+// The caller is responsible for digest stamping (stampDigests).
+//
+// This helper centralises the four PDU construction sites (Submit,
+// SubmitStreaming, retrySameConnection, retryTasks) to eliminate duplication
+// and ensure they all produce structurally identical PDUs.
+func buildSCSICommandPDU(cmd Command, itt, cmdSN, expStatSN uint32, immediateData []byte) (*transport.RawPDU, error) {
+	scsiCmd := &pdu.SCSICommand{
+		Header: pdu.Header{
+			Final:            true,
+			InitiatorTaskTag: itt,
+			DataSegmentLen:   uint32(len(immediateData)),
+		},
+		Read:                       cmd.Read,
+		Write:                      cmd.Write,
+		Attr:                       cmd.TaskAttributes,
+		ExpectedDataTransferLength: cmd.ExpectedDataTransferLen,
+		CmdSN:                      cmdSN,
+		ExpStatSN:                  expStatSN,
+		CDB:                        cmd.CDB,
+		ImmediateData:              immediateData,
+	}
+	scsiCmd.LUN = pdu.EncodeSAMLUN(cmd.LUN)
+
+	bhs, err := scsiCmd.MarshalBHS()
+	if err != nil {
+		return nil, err
+	}
+
+	raw := &transport.RawPDU{BHS: bhs}
+	if len(immediateData) > 0 {
+		raw.DataSegment = immediateData
+	}
+	return raw, nil
+}
+
 // cleanupTask removes a completed task from tracking.
 func (s *Session) cleanupTask(itt uint32) {
 	// Unregister (not UnregisterAndClose) is intentional: taskLoop exits via
@@ -870,32 +860,10 @@ func (s *Session) retrySameConnection(tk *task) {
 		tk.bytesSent = uint32(n)
 	}
 
-	scsiCmd := &pdu.SCSICommand{
-		Header: pdu.Header{
-			Final:            true,
-			InitiatorTaskTag: tk.itt, // original ITT
-			DataSegmentLen:   uint32(len(immediateData)),
-		},
-		Read:                       cmd.Read,
-		Write:                      cmd.Write,
-		Attr:                       cmd.TaskAttributes,
-		ExpectedDataTransferLength: cmd.ExpectedDataTransferLen,
-		CmdSN:                      tk.cmdSN, // original CmdSN
-		ExpStatSN:                  s.getExpStatSN(),
-		CDB:                        cmd.CDB, // original CDB
-		ImmediateData:              immediateData,
-	}
-	scsiCmd.LUN = pdu.EncodeSAMLUN(cmd.LUN)
-
-	bhs, encErr := scsiCmd.MarshalBHS()
+	raw, encErr := buildSCSICommandPDU(cmd, tk.itt, tk.cmdSN, s.getExpStatSN(), immediateData)
 	if encErr != nil {
 		tk.cancel(fmt.Errorf("session: same-connection retry encode: %w", encErr))
 		return
-	}
-
-	raw := &transport.RawPDU{BHS: bhs}
-	if len(immediateData) > 0 {
-		raw.DataSegment = immediateData
 	}
 	s.stampDigests(raw)
 
