@@ -262,7 +262,7 @@ func TestCloseWithLogout(t *testing.T) {
 // writeLogoutRespPDU encodes and writes a LogoutResp PDU to the target conn.
 func writeLogoutRespPDU(t *testing.T, conn net.Conn, resp *pdu.LogoutResp) {
 	t.Helper()
-	resp.Header.OpCode_ = pdu.OpLogoutResp
+	resp.OpCode_ = pdu.OpLogoutResp
 	raw := buildRawPDU(t, resp)
 	if err := transport.WriteRawPDU(conn, raw); err != nil {
 		t.Fatalf("write LogoutResp: %v", err)

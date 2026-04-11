@@ -195,7 +195,7 @@ func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error
 	}
 
 	// Set LUN in header.
-	scsiCmd.Header.LUN = pdu.EncodeSAMLUN(cmd.LUN)
+	scsiCmd.LUN = pdu.EncodeSAMLUN(cmd.LUN)
 
 	// Encode to wire format.
 	bhs, encErr := scsiCmd.MarshalBHS()
@@ -333,7 +333,7 @@ func (s *Session) SubmitStreaming(ctx context.Context, cmd Command) (<-chan Resu
 		CDB:                        cmd.CDB,
 		ImmediateData:              immediateData,
 	}
-	scsiCmd.Header.LUN = pdu.EncodeSAMLUN(cmd.LUN)
+	scsiCmd.LUN = pdu.EncodeSAMLUN(cmd.LUN)
 
 	bhs, encErr := scsiCmd.MarshalBHS()
 	if encErr != nil {
@@ -830,7 +830,7 @@ func (s *Session) retrySameConnection(tk *task) {
 		CDB:                        cmd.CDB, // original CDB
 		ImmediateData:              immediateData,
 	}
-	scsiCmd.Header.LUN = pdu.EncodeSAMLUN(cmd.LUN)
+	scsiCmd.LUN = pdu.EncodeSAMLUN(cmd.LUN)
 
 	bhs, encErr := scsiCmd.MarshalBHS()
 	if encErr != nil {

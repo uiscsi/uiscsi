@@ -162,7 +162,7 @@ func Discover(ctx context.Context, addr string, opts ...login.LoginOption) ([]Di
 	// Perform discovery login.
 	params, loginErr := login.Login(ctx, tc, allOpts...)
 	if loginErr != nil {
-		tc.Close()
+		_ = tc.Close()
 		return nil, fmt.Errorf("discover: login: %w", loginErr)
 	}
 
@@ -172,17 +172,19 @@ func Discover(ctx context.Context, addr string, opts ...login.LoginOption) ([]Di
 	// SendTargets.
 	targets, stErr := sess.SendTargets(ctx)
 	if stErr != nil {
-		sess.Close()
+		_ = sess.Close()
 		return nil, fmt.Errorf("discover: SendTargets: %w", stErr)
 	}
 
-	// Clean logout. If logout fails, just close.
-	if logoutErr := sess.Logout(ctx); logoutErr != nil {
-		sess.Close()
-		return targets, nil // return targets even if logout fails
+	// Clean logout. If logout fails, just close and return targets anyway.
+	// Logout errors are non-fatal for discovery sessions — we already have
+	// the target list. Swallow the error intentionally.
+	logoutErr := sess.Logout(ctx)
+	_ = sess.Close()
+	if logoutErr != nil {
+		return targets, nil //nolint:nilerr // intentional: discovery succeeded; logout error is non-fatal
 	}
 
-	sess.Close()
 	return targets, nil
 }
 

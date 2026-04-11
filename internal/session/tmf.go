@@ -31,7 +31,7 @@ func (s *Session) sendTMF(ctx context.Context, fn uint8, refTaskTag uint32, lun 
 	}
 
 	// Set LUN in header for LUN-scoped TMFs (SAM-5 encoding).
-	tmfReq.Header.LUN = pdu.EncodeSAMLUN(lun)
+	tmfReq.LUN = pdu.EncodeSAMLUN(lun)
 
 	bhs, err := tmfReq.MarshalBHS()
 	if err != nil {

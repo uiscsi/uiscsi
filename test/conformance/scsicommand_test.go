@@ -26,7 +26,7 @@ func TestSCSICommand_ImmediateDataMatrix(t *testing.T) {
 		setup := newWriteTestSetup(t, negCfg)
 
 		setup.Target.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-			expCmdSN, maxCmdSN := setup.Target.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+			expCmdSN, maxCmdSN := setup.Target.Session().Update(cmd.CmdSN, cmd.Immediate)
 			// ImmediateData=Yes, EDTL=FBL=MaxRecvDSL=512: all data in immediate.
 			// No unsolicited Data-Out expected (FBL exhausted by immediate).
 			return sendSCSIResponse(tc, cmd, expCmdSN, maxCmdSN)
@@ -60,7 +60,7 @@ func TestSCSICommand_ImmediateDataMatrix(t *testing.T) {
 		if scsiCmd.ExpectedDataTransferLength != 512 {
 			t.Errorf("SCSI Command EDTL=%d, want 512", scsiCmd.ExpectedDataTransferLength)
 		}
-		if !scsiCmd.Header.Final {
+		if !scsiCmd.Final {
 			t.Error("SCSI Command Final=false, want true")
 		}
 	})
@@ -76,7 +76,7 @@ func TestSCSICommand_ImmediateDataMatrix(t *testing.T) {
 		setup := newWriteTestSetup(t, negCfg)
 
 		setup.Target.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-			expCmdSN, _ := setup.Target.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+			expCmdSN, _ := setup.Target.Session().Update(cmd.CmdSN, cmd.Immediate)
 			// Send R2T for full EDTL, consume Data-Out, send response.
 			_, maxCmdSN, err := sendR2TAndConsume(tc, setup.Target, cmd, 0x00000001, 0, cmd.ExpectedDataTransferLength)
 			if err != nil {
@@ -113,7 +113,7 @@ func TestSCSICommand_ImmediateDataMatrix(t *testing.T) {
 		if scsiCmd.ExpectedDataTransferLength != 512 {
 			t.Errorf("SCSI Command EDTL=%d, want 512", scsiCmd.ExpectedDataTransferLength)
 		}
-		if !scsiCmd.Header.Final {
+		if !scsiCmd.Final {
 			t.Error("SCSI Command Final=false, want true (InitialR2T=Yes means no unsolicited)")
 		}
 	})
@@ -129,7 +129,7 @@ func TestSCSICommand_ImmediateDataMatrix(t *testing.T) {
 		setup := newWriteTestSetup(t, negCfg)
 
 		setup.Target.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-			expCmdSN, _ := setup.Target.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+			expCmdSN, _ := setup.Target.Session().Update(cmd.CmdSN, cmd.Immediate)
 			// Send R2T for full EDTL, consume Data-Out, send response.
 			_, maxCmdSN, err := sendR2TAndConsume(tc, setup.Target, cmd, 0x00000001, 0, cmd.ExpectedDataTransferLength)
 			if err != nil {
@@ -184,7 +184,7 @@ func TestSCSICommand_ImmediateDataMatrix(t *testing.T) {
 		setup := newWriteTestSetup(t, negCfg)
 
 		setup.Target.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-			expCmdSN, maxCmdSN := setup.Target.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+			expCmdSN, maxCmdSN := setup.Target.Session().Update(cmd.CmdSN, cmd.Immediate)
 			// Read unsolicited Data-Out until F-bit.
 			if _, err := testutil.ReadDataOutPDUs(tc); err != nil {
 				return err
@@ -247,7 +247,7 @@ func TestSCSICommand_UnsolicitedFBit(t *testing.T) {
 		setup := newWriteTestSetup(t, negCfg)
 
 		setup.Target.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-			expCmdSN, maxCmdSN := setup.Target.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+			expCmdSN, maxCmdSN := setup.Target.Session().Update(cmd.CmdSN, cmd.Immediate)
 			// All data fits in SCSI Command (EDTL=FBL=MaxRecvDSL=512). No Data-Out.
 			return sendSCSIResponse(tc, cmd, expCmdSN, maxCmdSN)
 		})
@@ -277,7 +277,7 @@ func TestSCSICommand_UnsolicitedFBit(t *testing.T) {
 		if scsiCmd.ExpectedDataTransferLength != 512 {
 			t.Errorf("SCSI Command EDTL=%d, want 512", scsiCmd.ExpectedDataTransferLength)
 		}
-		if !scsiCmd.Header.Final {
+		if !scsiCmd.Final {
 			t.Error("SCSI Command Final=false, want true (EDTL=DSL, all data in immediate)")
 		}
 
@@ -303,7 +303,7 @@ func TestSCSICommand_UnsolicitedFBit(t *testing.T) {
 		setup := newWriteTestSetup(t, negCfg)
 
 		setup.Target.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-			expCmdSN, maxCmdSN := setup.Target.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+			expCmdSN, maxCmdSN := setup.Target.Session().Update(cmd.CmdSN, cmd.Immediate)
 			// ImmediateData=Yes, InitialR2T=Yes: immediate data in SCSI Command
 			// but no unsolicited Data-Out follows. Send R2T for remaining.
 			remaining := cmd.ExpectedDataTransferLength - cmd.DataSegmentLen
@@ -336,7 +336,7 @@ func TestSCSICommand_UnsolicitedFBit(t *testing.T) {
 		}
 		scsiCmd := cmds[0].Decoded.(*pdu.SCSICommand)
 
-		if !scsiCmd.Header.Final {
+		if !scsiCmd.Final {
 			t.Error("SCSI Command Final=false, want true (InitialR2T=Yes, no unsolicited Data-Out follows)")
 		}
 		if scsiCmd.DataSegmentLen != 512 {
@@ -435,7 +435,7 @@ func TestSCSICommand_FirstBurstLength(t *testing.T) {
 			setup := newWriteTestSetup(t, negCfg)
 
 			setup.Target.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-				expCmdSN, maxCmdSN := setup.Target.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+				expCmdSN, maxCmdSN := setup.Target.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 				if sc.needRead {
 					// Read unsolicited Data-Out until F-bit.
@@ -501,8 +501,8 @@ func TestSCSICommand_FirstBurstLength(t *testing.T) {
 			if scsiCmd.ExpectedDataTransferLength != sc.edtl {
 				t.Errorf("SCSI Command EDTL=%d, want %d", scsiCmd.ExpectedDataTransferLength, sc.edtl)
 			}
-			if scsiCmd.Header.Final != sc.wantF {
-				t.Errorf("SCSI Command Final=%v, want %v", scsiCmd.Header.Final, sc.wantF)
+			if scsiCmd.Final != sc.wantF {
+				t.Errorf("SCSI Command Final=%v, want %v", scsiCmd.Final, sc.wantF)
 			}
 			if !scsiCmd.Write {
 				t.Error("SCSI Command Write=false, want true")

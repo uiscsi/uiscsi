@@ -26,8 +26,8 @@ func readTaskMgmtReqPDU(t *testing.T, conn net.Conn) *pdu.TaskMgmtReq {
 // writeTaskMgmtRespPDU encodes and writes a TaskMgmtResp PDU to the target conn.
 func writeTaskMgmtRespPDU(t *testing.T, conn net.Conn, resp *pdu.TaskMgmtResp) {
 	t.Helper()
-	resp.Header.OpCode_ = pdu.OpTaskMgmtResp
-	resp.Header.Final = true
+	resp.OpCode_ = pdu.OpTaskMgmtResp
+	resp.Final = true
 	bhs, err := resp.MarshalBHS()
 	if err != nil {
 		t.Fatalf("MarshalBHS TaskMgmtResp: %v", err)
@@ -195,7 +195,7 @@ func TestAbortTaskSet(t *testing.T) {
 		t.Fatalf("Function: got %d, want %d", tmfReq.Function, TMFAbortTaskSet)
 	}
 	// Verify LUN is encoded in the TMF header.
-	gotLUN := pdu.DecodeSAMLUN(tmfReq.Header.LUN[:])
+	gotLUN := pdu.DecodeSAMLUN(tmfReq.LUN[:])
 	if gotLUN != lun {
 		t.Fatalf("LUN: got %d, want %d", gotLUN, lun)
 	}
@@ -253,7 +253,7 @@ func TestLUNReset(t *testing.T) {
 	if tmfReq.Function != TMFLogicalUnitReset {
 		t.Fatalf("Function: got %d, want %d", tmfReq.Function, TMFLogicalUnitReset)
 	}
-	gotLUN := pdu.DecodeSAMLUN(tmfReq.Header.LUN[:])
+	gotLUN := pdu.DecodeSAMLUN(tmfReq.LUN[:])
 	if gotLUN != lun {
 		t.Fatalf("LUN: got %d, want %d", gotLUN, lun)
 	}
@@ -375,7 +375,7 @@ func TestClearTaskSet(t *testing.T) {
 	if tmfReq.Function != TMFClearTaskSet {
 		t.Fatalf("Function: got %d, want %d", tmfReq.Function, TMFClearTaskSet)
 	}
-	gotLUN := pdu.DecodeSAMLUN(tmfReq.Header.LUN[:])
+	gotLUN := pdu.DecodeSAMLUN(tmfReq.LUN[:])
 	if gotLUN != lun {
 		t.Fatalf("LUN: got %d, want %d", gotLUN, lun)
 	}

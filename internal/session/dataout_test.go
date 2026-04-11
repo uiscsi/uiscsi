@@ -29,7 +29,7 @@ func newTestSessionWithParams(t *testing.T, params login.NegotiatedParams) (*Ses
 // writeR2TPDU encodes and writes an R2T PDU to the target conn.
 func writeR2TPDU(t *testing.T, conn net.Conn, r2t *pdu.R2T) {
 	t.Helper()
-	r2t.Header.OpCode_ = pdu.OpR2T
+	r2t.OpCode_ = pdu.OpR2T
 	raw := buildRawPDU(t, r2t)
 	if err := transport.WriteRawPDU(conn, raw); err != nil {
 		t.Fatalf("write R2T: %v", err)
@@ -156,7 +156,7 @@ func TestWriteSolicitedR2TLargePayload(t *testing.T) {
 	if dout.TargetTransferTag != 0x1234 {
 		t.Fatalf("TTT: got 0x%08X, want 0x00001234", dout.TargetTransferTag)
 	}
-	if !dout.Header.Final {
+	if !dout.Final {
 		t.Fatal("Final bit not set on last Data-Out PDU")
 	}
 	if len(dout.Data) != 500 {
@@ -232,7 +232,7 @@ func TestWriteUnsolicitedDataOut(t *testing.T) {
 	if len(dout.Data) != 512 {
 		t.Fatalf("unsolicited data length: got %d, want 512", len(dout.Data))
 	}
-	if !dout.Header.Final {
+	if !dout.Final {
 		t.Fatal("Final bit not set on last unsolicited Data-Out PDU")
 	}
 
@@ -265,10 +265,10 @@ func TestWriteUnsolicitedDataOut(t *testing.T) {
 			t.Fatalf("solicited PDU %d data length: got %d, want 512", i, len(dout.Data))
 		}
 		// Final bit only on last PDU.
-		if i == 1 && !dout.Header.Final {
+		if i == 1 && !dout.Final {
 			t.Fatalf("solicited PDU %d: Final bit not set", i)
 		}
-		if i == 0 && dout.Header.Final {
+		if i == 0 && dout.Final {
 			t.Fatalf("solicited PDU %d: Final bit should not be set", i)
 		}
 	}
@@ -460,10 +460,10 @@ func TestWriteMultiPDUBurst(t *testing.T) {
 			t.Fatalf("PDU %d TTT: got 0x%08X, want 0x00009999", i, dout.TargetTransferTag)
 		}
 		// Final only on last PDU.
-		if i == 2 && !dout.Header.Final {
+		if i == 2 && !dout.Final {
 			t.Fatalf("PDU %d: Final bit not set on last PDU", i)
 		}
-		if i < 2 && dout.Header.Final {
+		if i < 2 && dout.Final {
 			t.Fatalf("PDU %d: Final bit should not be set", i)
 		}
 	}
@@ -661,7 +661,7 @@ func TestWriteMatrix(t *testing.T) {
 					receivedData = append(receivedData, dout.Data...)
 					offset += uint32(len(dout.Data))
 					unsolRemaining -= uint32(len(dout.Data))
-					if dout.Header.Final {
+					if dout.Final {
 						break
 					}
 				}
@@ -695,7 +695,7 @@ func TestWriteMatrix(t *testing.T) {
 					}
 					receivedData = append(receivedData, dout.Data...)
 					burstReceived += uint32(len(dout.Data))
-					if dout.Header.Final {
+					if dout.Final {
 						break
 					}
 				}
@@ -803,10 +803,10 @@ func TestWriteMultiR2TSequence(t *testing.T) {
 			}
 
 			// Final bit only on last PDU of burst.
-			if pduIdx == 3 && !dout.Header.Final {
+			if pduIdx == 3 && !dout.Final {
 				t.Fatalf("R2T %d PDU %d: Final bit not set on last PDU", r2tIdx, pduIdx)
 			}
-			if pduIdx < 3 && dout.Header.Final {
+			if pduIdx < 3 && dout.Final {
 				t.Fatalf("R2T %d PDU %d: Final bit should not be set", r2tIdx, pduIdx)
 			}
 
@@ -885,7 +885,7 @@ func TestWriteSmallData(t *testing.T) {
 	if dout.DataSN != 0 {
 		t.Fatalf("DataSN: got %d, want 0", dout.DataSN)
 	}
-	if !dout.Header.Final {
+	if !dout.Final {
 		t.Fatal("Final bit not set on single Data-Out PDU")
 	}
 	if dout.TargetTransferTag != 0xBEEF {
@@ -973,10 +973,10 @@ func TestWriteExactBurstBoundary(t *testing.T) {
 			t.Fatalf("PDU %d: data length got %d, want 512", i, len(dout.Data))
 		}
 		// Final only on last PDU.
-		if i == 1 && !dout.Header.Final {
+		if i == 1 && !dout.Final {
 			t.Fatalf("PDU %d: Final bit not set on last PDU", i)
 		}
-		if i == 0 && dout.Header.Final {
+		if i == 0 && dout.Final {
 			t.Fatalf("PDU %d: Final bit should not be set", i)
 		}
 		receivedData = append(receivedData, dout.Data...)

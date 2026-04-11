@@ -36,11 +36,11 @@ func TestNOPOut_PingResponse(t *testing.T) {
 	// does NOT advance ExpCmdSN.
 	tgt.Handle(pdu.OpNOPOut, func(tc *testutil.TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
 		req := decoded.(*pdu.NOPOut)
-		expCmdSN, maxCmdSN := tgt.Session().Update(req.CmdSN, req.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(req.CmdSN, req.Immediate)
 		resp := &pdu.NOPIn{
 			Header: pdu.Header{
 				Final:            true,
-				InitiatorTaskTag: req.Header.InitiatorTaskTag,
+				InitiatorTaskTag: req.InitiatorTaskTag,
 			},
 			TargetTransferTag: 0xFFFFFFFF,
 			StatSN:            tc.NextStatSN(),
@@ -53,7 +53,7 @@ func TestNOPOut_PingResponse(t *testing.T) {
 
 	// HandleSCSIFunc: on first call, inject a solicited NOP-In with known TTT and LUN.
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		// Send SCSI response first.
 		resp := &pdu.SCSIResponse{
@@ -118,7 +118,7 @@ func TestNOPOut_PingResponse(t *testing.T) {
 	var responseNOP *pdu.NOPOut
 	for _, n := range nops {
 		nopOut := n.Decoded.(*pdu.NOPOut)
-		if nopOut.Header.InitiatorTaskTag == 0xFFFFFFFF && nopOut.TargetTransferTag == testTTT {
+		if nopOut.InitiatorTaskTag == 0xFFFFFFFF && nopOut.TargetTransferTag == testTTT {
 			responseNOP = nopOut
 			break
 		}
@@ -131,8 +131,8 @@ func TestNOPOut_PingResponse(t *testing.T) {
 	// Verify all wire fields per FFP #15.1.
 
 	// ITT = 0xFFFFFFFF (response, not new task)
-	if responseNOP.Header.InitiatorTaskTag != 0xFFFFFFFF {
-		t.Errorf("ITT: got 0x%08X, want 0xFFFFFFFF", responseNOP.Header.InitiatorTaskTag)
+	if responseNOP.InitiatorTaskTag != 0xFFFFFFFF {
+		t.Errorf("ITT: got 0x%08X, want 0xFFFFFFFF", responseNOP.InitiatorTaskTag)
 	}
 
 	// TTT = testTTT (echoed from NOP-In)
@@ -141,18 +141,18 @@ func TestNOPOut_PingResponse(t *testing.T) {
 	}
 
 	// Immediate = true (I-bit set)
-	if !responseNOP.Header.Immediate {
+	if !responseNOP.Immediate {
 		t.Error("Immediate: got false, want true")
 	}
 
 	// Final = true (F-bit set)
-	if !responseNOP.Header.Final {
+	if !responseNOP.Final {
 		t.Error("Final: got false, want true")
 	}
 
 	// LUN = testLUN (echoed from NOP-In per RFC 7143 S11.18)
-	if responseNOP.Header.LUN != testLUN {
-		t.Errorf("LUN: got %v, want %v", responseNOP.Header.LUN, testLUN)
+	if responseNOP.LUN != testLUN {
+		t.Errorf("LUN: got %v, want %v", responseNOP.LUN, testLUN)
 	}
 
 	// CmdSN present (carried, not advanced).
@@ -202,14 +202,14 @@ func TestNOPOut_ExpStatSNConfirmation(t *testing.T) {
 		req := decoded.(*pdu.NOPOut)
 		// ExpStatSN confirmation has ITT=0xFFFFFFFF — no response expected.
 		// Only respond to pings (ITT != 0xFFFFFFFF).
-		if req.Header.InitiatorTaskTag == 0xFFFFFFFF {
+		if req.InitiatorTaskTag == 0xFFFFFFFF {
 			return nil
 		}
-		expCmdSN, maxCmdSN := tgt.Session().Update(req.CmdSN, req.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(req.CmdSN, req.Immediate)
 		resp := &pdu.NOPIn{
 			Header: pdu.Header{
 				Final:            true,
-				InitiatorTaskTag: req.Header.InitiatorTaskTag,
+				InitiatorTaskTag: req.InitiatorTaskTag,
 			},
 			TargetTransferTag: 0xFFFFFFFF,
 			StatSN:            tc.NextStatSN(),
@@ -221,7 +221,7 @@ func TestNOPOut_ExpStatSNConfirmation(t *testing.T) {
 
 	// HandleSCSIFunc: standard response for TestUnitReady.
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 		resp := &pdu.SCSIResponse{
 			Header: pdu.Header{
 				Final:            true,
@@ -277,7 +277,7 @@ func TestNOPOut_ExpStatSNConfirmation(t *testing.T) {
 	var found *pdu.NOPOut
 	for _, cap := range nopouts {
 		nop := cap.Decoded.(*pdu.NOPOut)
-		if nop.Header.InitiatorTaskTag == 0xFFFFFFFF && nop.TargetTransferTag == 0xFFFFFFFF {
+		if nop.InitiatorTaskTag == 0xFFFFFFFF && nop.TargetTransferTag == 0xFFFFFFFF {
 			found = nop
 			break
 		}
@@ -289,18 +289,18 @@ func TestNOPOut_ExpStatSNConfirmation(t *testing.T) {
 	// Verify all wire fields per FFP #15.3.
 
 	// I-bit = true (Immediate)
-	if !found.Header.Immediate {
+	if !found.Immediate {
 		t.Error("Immediate: got false, want true")
 	}
 
 	// F-bit = true (Final)
-	if !found.Header.Final {
+	if !found.Final {
 		t.Error("Final: got false, want true")
 	}
 
 	// ITT = 0xFFFFFFFF (no response expected)
-	if found.Header.InitiatorTaskTag != 0xFFFFFFFF {
-		t.Errorf("ITT: got 0x%08X, want 0xFFFFFFFF", found.Header.InitiatorTaskTag)
+	if found.InitiatorTaskTag != 0xFFFFFFFF {
+		t.Errorf("ITT: got 0x%08X, want 0xFFFFFFFF", found.InitiatorTaskTag)
 	}
 
 	// TTT = 0xFFFFFFFF
@@ -345,11 +345,11 @@ func TestNOPOut_PingRequest(t *testing.T) {
 	// Custom NOP-Out handler with SessionState for correct sequencing.
 	tgt.Handle(pdu.OpNOPOut, func(tc *testutil.TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
 		req := decoded.(*pdu.NOPOut)
-		expCmdSN, maxCmdSN := tgt.Session().Update(req.CmdSN, req.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(req.CmdSN, req.Immediate)
 		resp := &pdu.NOPIn{
 			Header: pdu.Header{
 				Final:            true,
-				InitiatorTaskTag: req.Header.InitiatorTaskTag,
+				InitiatorTaskTag: req.InitiatorTaskTag,
 			},
 			TargetTransferTag: 0xFFFFFFFF,
 			StatSN:            tc.NextStatSN(),
@@ -380,7 +380,7 @@ func TestNOPOut_PingRequest(t *testing.T) {
 	var pingNOP *pdu.NOPOut
 	for _, n := range nops {
 		nopOut := n.Decoded.(*pdu.NOPOut)
-		if nopOut.Header.InitiatorTaskTag != 0xFFFFFFFF && nopOut.TargetTransferTag == 0xFFFFFFFF {
+		if nopOut.InitiatorTaskTag != 0xFFFFFFFF && nopOut.TargetTransferTag == 0xFFFFFFFF {
 			pingNOP = nopOut
 			break
 		}
@@ -391,7 +391,7 @@ func TestNOPOut_PingRequest(t *testing.T) {
 	}
 
 	// ITT != 0xFFFFFFFF (valid task tag, initiator-originated)
-	if pingNOP.Header.InitiatorTaskTag == 0xFFFFFFFF {
+	if pingNOP.InitiatorTaskTag == 0xFFFFFFFF {
 		t.Error("ITT: got 0xFFFFFFFF, want valid task tag for initiator-originated ping")
 	}
 
@@ -401,18 +401,18 @@ func TestNOPOut_PingRequest(t *testing.T) {
 	}
 
 	// I-bit = true (immediate)
-	if !pingNOP.Header.Immediate {
+	if !pingNOP.Immediate {
 		t.Error("Immediate: got false, want true")
 	}
 
 	// Final = true
-	if !pingNOP.Header.Final {
+	if !pingNOP.Final {
 		t.Error("Final: got false, want true")
 	}
 
 	// LUN = all zeros (initiator-originated, no specific LUN)
 	var zeroLUN [8]byte
-	if pingNOP.Header.LUN != zeroLUN {
-		t.Errorf("LUN: got %v, want all zeros", pingNOP.Header.LUN)
+	if pingNOP.LUN != zeroLUN {
+		t.Errorf("LUN: got %v, want all zeros", pingNOP.LUN)
 	}
 }

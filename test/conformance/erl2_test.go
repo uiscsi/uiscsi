@@ -48,7 +48,7 @@ func TestERL2_ConnectionReassignment(t *testing.T) {
 	// allocated (which it sends as a SCSI Command after reassignment).
 	tgt.Handle(pdu.OpTaskMgmtReq, func(tc *testutil.TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
 		tmf := decoded.(*pdu.TaskMgmtReq)
-		expCmdSN, maxCmdSN := tgt.Session().Update(tmf.CmdSN, tmf.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(tmf.CmdSN, tmf.Immediate)
 		resp := &pdu.TaskMgmtResp{
 			Header: pdu.Header{
 				Final:            true,
@@ -66,7 +66,7 @@ func TestERL2_ConnectionReassignment(t *testing.T) {
 	// callCount==0: drop connection without responding (simulate TCP failure).
 	// callCount>=1: respond normally with Data-In (status + 512 bytes).
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 		if callCount == 0 {
 			// Drop the connection to trigger ERL 2 recovery.
 			tc.Close()
@@ -197,7 +197,7 @@ func TestERL2_TaskReassign(t *testing.T) {
 	// Register TMF handler: record TMF details and respond Function Complete.
 	tgt.Handle(pdu.OpTaskMgmtReq, func(tc *testutil.TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
 		tmf := decoded.(*pdu.TaskMgmtReq)
-		expCmdSN, maxCmdSN := tgt.Session().Update(tmf.CmdSN, tmf.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(tmf.CmdSN, tmf.Immediate)
 
 		// Send capture to test goroutine (non-blocking).
 		select {
@@ -223,7 +223,7 @@ func TestERL2_TaskReassign(t *testing.T) {
 	// callCount>=1: respond normally.
 	var originalITT atomic.Uint32
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 		if callCount == 0 {
 			originalITT.Store(cmd.InitiatorTaskTag)
 			tc.Close()

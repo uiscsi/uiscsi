@@ -1,5 +1,3 @@
-// sense.go provides public sense data parsing and status checking helpers
-// for callers of Execute and StreamExecute.
 package uiscsi
 
 import (

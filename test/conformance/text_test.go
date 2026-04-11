@@ -27,7 +27,7 @@ func triggerRenegotiationViaAsync(
 	callCount, triggerOnCall int,
 ) error {
 	t.Helper()
-	expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+	expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 	resp := &pdu.SCSIResponse{
 		Header: pdu.Header{
@@ -137,7 +137,7 @@ func TestText_Fields(t *testing.T) {
 	}
 
 	// F-bit must be true for single-shot renegotiation.
-	if !textReq.Header.Final {
+	if !textReq.Final {
 		t.Error("Final (F-bit): got false, want true")
 	}
 
@@ -226,7 +226,7 @@ func TestText_ITTUniqueness(t *testing.T) {
 
 	ittSet := make(map[uint32]bool)
 	for i, tr := range textReqs[:3] {
-		itt := tr.Decoded.(*pdu.TextReq).Header.InitiatorTaskTag
+		itt := tr.Decoded.(*pdu.TextReq).InitiatorTaskTag
 		if itt == 0xFFFFFFFF {
 			t.Errorf("TextReq[%d] ITT is reserved 0xFFFFFFFF", i)
 		}
@@ -314,11 +314,11 @@ func TestText_TTTContinuation(t *testing.T) {
 	// second response has C=0 and TTT=0xFFFFFFFF with final data.
 	tgt.Handle(pdu.OpTextReq, func(tc *testutil.TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
 		req := decoded.(*pdu.TextReq)
-		expCmdSN, maxCmdSN := tgt.Session().Update(req.CmdSN, req.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(req.CmdSN, req.Immediate)
 
 		mu.Lock()
 		captured = append(captured, capturedReq{
-			ITT: req.Header.InitiatorTaskTag,
+			ITT: req.InitiatorTaskTag,
 			TTT: req.TargetTransferTag,
 		})
 		reqNum := len(captured)
@@ -332,7 +332,7 @@ func TestText_TTTContinuation(t *testing.T) {
 			resp := &pdu.TextResp{
 				Header: pdu.Header{
 					Final:            false,
-					InitiatorTaskTag: req.Header.InitiatorTaskTag,
+					InitiatorTaskTag: req.InitiatorTaskTag,
 					DataSegmentLen:   uint32(len(partialData)),
 				},
 				Continue:          true,
@@ -352,7 +352,7 @@ func TestText_TTTContinuation(t *testing.T) {
 		resp := &pdu.TextResp{
 			Header: pdu.Header{
 				Final:            true,
-				InitiatorTaskTag: req.Header.InitiatorTaskTag,
+				InitiatorTaskTag: req.InitiatorTaskTag,
 				DataSegmentLen:   uint32(len(finalData)),
 			},
 			Continue:          false,
@@ -445,7 +445,7 @@ func TestText_OtherParams(t *testing.T) {
 	textReq := textReqs[0].Decoded.(*pdu.TextReq)
 
 	// Immediate bit must be false (TextReq acquires CmdSN).
-	if textReq.Header.Immediate {
+	if textReq.Immediate {
 		t.Error("Immediate: got true, want false (TextReq is non-immediate)")
 	}
 
@@ -518,9 +518,9 @@ func TestText_NegotiationReset(t *testing.T) {
 	second := textReqs[1].Decoded.(*pdu.TextReq)
 
 	// Fresh ITT: second exchange must use a different ITT.
-	if first.Header.InitiatorTaskTag == second.Header.InitiatorTaskTag {
+	if first.InitiatorTaskTag == second.InitiatorTaskTag {
 		t.Errorf("second TextReq has same ITT (0x%08X) as first; want fresh ITT",
-			first.Header.InitiatorTaskTag)
+			first.InitiatorTaskTag)
 	}
 
 	// Fresh exchange: TTT must be 0xFFFFFFFF (not stale from prior exchange).

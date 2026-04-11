@@ -14,13 +14,13 @@ type routerEntry struct {
 	persistent bool
 }
 
+// DefaultRouterBufDepth is the default persistent channel buffer depth.
+const DefaultRouterBufDepth = 64
+
 // Router manages ITT-based PDU dispatch. When a command goroutine sends
 // a request, it registers an ITT via Register and waits on the returned
 // channel. When the read pump receives a response, it calls Dispatch with
 // the ITT from the BHS to deliver the response to the correct waiter.
-// DefaultRouterBufDepth is the default persistent channel buffer depth.
-const DefaultRouterBufDepth = 64
-
 type Router struct {
 	mu              sync.Mutex
 	pending         map[uint32]*routerEntry

@@ -39,7 +39,7 @@ func TestSNACK_DataSNGap(t *testing.T) {
 	}
 
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		// Send DataSN=0 (512 bytes at offset 0).
 		din0 := &pdu.DataIn{
@@ -203,7 +203,7 @@ func TestSNACK_DataACKWireFields(t *testing.T) {
 	}
 
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		for i := range 3 {
 			offset := uint32(i * 512)

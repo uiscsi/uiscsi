@@ -117,7 +117,7 @@ func (rt *recoverableTarget) handleLogin(conn net.Conn) error {
 		StatusClass: 0,
 		Data:        login.EncodeTextKV([]login.KeyValue{{Key: "AuthMethod", Value: "None"}}),
 	}
-	secResp.Header.DataSegmentLen = uint32(len(secResp.Data))
+	secResp.DataSegmentLen = uint32(len(secResp.Data))
 	bhs, err := secResp.MarshalBHS()
 	if err != nil {
 		return fmt.Errorf("marshal security resp: %w", err)

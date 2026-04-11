@@ -1,5 +1,3 @@
-// errors.go defines the public error hierarchy for the uiscsi package.
-// All errors support errors.As/errors.Is for inspection.
 package uiscsi
 
 import (

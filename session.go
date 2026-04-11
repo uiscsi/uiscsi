@@ -1,5 +1,3 @@
-// session.go defines the Session type, accessor methods for grouped APIs,
-// and deprecated flat methods for backward compatibility.
 package uiscsi
 
 import (

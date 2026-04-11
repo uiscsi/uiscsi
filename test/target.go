@@ -179,7 +179,7 @@ func (mt *MockTarget) SendAsyncMsg(tc *TargetConn, event uint8, params AsyncPara
 	}
 	if len(params.SenseData) > 0 {
 		async.Data = params.SenseData
-		async.Header.DataSegmentLen = uint32(len(params.SenseData))
+		async.DataSegmentLen = uint32(len(params.SenseData))
 	}
 	return tc.SendPDU(async)
 }
@@ -262,7 +262,7 @@ func (mt *MockTarget) SetNegotiationConfig(cfg NegotiationConfig) {
 // HandleSCSIWrite, HandleSCSIError).
 func (mt *MockTarget) HandleSCSIFunc(h func(tc *TargetConn, cmd *pdu.SCSICommand, callCount int) error) {
 	var count atomic.Int32
-	mt.Handle(pdu.OpSCSICommand, func(tc *TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
+	mt.Handle(pdu.OpSCSICommand, func(tc *TargetConn, _ *transport.RawPDU, decoded pdu.PDU) error {
 		cmd := decoded.(*pdu.SCSICommand)
 		n := int(count.Add(1) - 1)
 		return h(tc, cmd, n)
@@ -288,7 +288,7 @@ func (mt *MockTarget) Close() error {
 	// Close all active connections to unblock serve loops.
 	mt.mu.Lock()
 	for _, tc := range mt.conns {
-		tc.nc.Close()
+		_ = tc.nc.Close()
 	}
 	mt.mu.Unlock()
 	mt.wg.Wait()
@@ -386,7 +386,7 @@ func attachDataSegment(p pdu.PDU, data []byte) {
 //  3. Accepts all proposed operational parameters (echoes target values)
 //  4. Sets TSIH=1 in final response
 func (mt *MockTarget) HandleLogin() {
-	mt.Handle(pdu.OpLoginReq, func(tc *TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
+	mt.Handle(pdu.OpLoginReq, func(tc *TargetConn, _ *transport.RawPDU, decoded pdu.PDU) error {
 		req := decoded.(*pdu.LoginReq)
 		kvs := login.DecodeTextKV(req.Data)
 
@@ -399,8 +399,7 @@ func (mt *MockTarget) HandleLogin() {
 			// Build response keys.
 			var respKVs []login.KeyValue
 			for _, kv := range kvs {
-				switch kv.Key {
-				case "AuthMethod":
+				if kv.Key == "AuthMethod" {
 					respKVs = append(respKVs, login.KeyValue{Key: "AuthMethod", Value: "None"})
 				}
 			}
@@ -554,14 +553,14 @@ func (mt *MockTarget) HandleLogin() {
 // HandleText registers a handler for Text Request PDUs that echoes back
 // the received key-value pairs as accepted. Used for renegotiation tests.
 func (mt *MockTarget) HandleText() {
-	mt.Handle(pdu.OpTextReq, func(tc *TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
+	mt.Handle(pdu.OpTextReq, func(tc *TargetConn, _ *transport.RawPDU, decoded pdu.PDU) error {
 		req := decoded.(*pdu.TextReq)
-		expCmdSN, maxCmdSN := mt.session.Update(req.CmdSN, req.Header.Immediate)
+		expCmdSN, maxCmdSN := mt.session.Update(req.CmdSN, req.Immediate)
 		resp := &pdu.TextResp{
 			Header: pdu.Header{
 				Final:            true,
-				InitiatorTaskTag: req.Header.InitiatorTaskTag,
-				DataSegmentLen:   req.Header.DataSegmentLen,
+				InitiatorTaskTag: req.InitiatorTaskTag,
+				DataSegmentLen:   req.DataSegmentLen,
 			},
 			TargetTransferTag: 0xFFFFFFFF,
 			StatSN:            tc.NextStatSN(),
@@ -576,8 +575,8 @@ func (mt *MockTarget) HandleText() {
 // HandleSCSIRead registers a handler that responds to SCSI read commands
 // on the specified LUN with the provided data. It sends a single DataIn
 // PDU with status followed by (implicit) SCSIResponse.
-func (mt *MockTarget) HandleSCSIRead(lun uint64, data []byte) {
-	mt.Handle(pdu.OpSCSICommand, func(tc *TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
+func (mt *MockTarget) HandleSCSIRead(_ uint64, data []byte) {
+	mt.Handle(pdu.OpSCSICommand, func(tc *TargetConn, _ *transport.RawPDU, decoded pdu.PDU) error {
 		cmd := decoded.(*pdu.SCSICommand)
 
 		if cmd.Read {
@@ -629,8 +628,8 @@ func (mt *MockTarget) HandleSCSIRead(lun uint64, data []byte) {
 		// Check CDB opcode to determine if this is INQUIRY (0x12)
 		// or other commands that return data.
 		cdbOp := cmd.CDB[0]
-		switch {
-		case cdbOp == 0x12: // INQUIRY
+		switch cdbOp {
+		case 0x12: // INQUIRY
 			sendLen := int(cmd.ExpectedDataTransferLength)
 			if sendLen > len(data) {
 				sendLen = len(data)
@@ -651,7 +650,7 @@ func (mt *MockTarget) HandleSCSIRead(lun uint64, data []byte) {
 			}
 			return tc.SendPDU(din)
 
-		case cdbOp == 0x25 || cdbOp == 0x9e: // READ CAPACITY(10) or SERVICE ACTION IN(16) for READ CAPACITY(16)
+		case 0x25, 0x9e: // READ CAPACITY(10) or SERVICE ACTION IN(16) for READ CAPACITY(16)
 			sendLen := int(cmd.ExpectedDataTransferLength)
 			if sendLen > len(data) {
 				sendLen = len(data)
@@ -672,7 +671,7 @@ func (mt *MockTarget) HandleSCSIRead(lun uint64, data []byte) {
 			}
 			return tc.SendPDU(din)
 
-		case cdbOp == 0xa0: // REPORT LUNS
+		case 0xa0: // REPORT LUNS
 			sendLen := int(cmd.ExpectedDataTransferLength)
 			if sendLen > len(data) {
 				sendLen = len(data)
@@ -712,8 +711,8 @@ func (mt *MockTarget) HandleSCSIRead(lun uint64, data []byte) {
 
 // HandleSCSIWrite registers a handler for SCSI write commands.
 // Accepts immediate data and sends SCSIResponse(status=0).
-func (mt *MockTarget) HandleSCSIWrite(lun uint64) {
-	mt.Handle(pdu.OpSCSICommand, func(tc *TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
+func (mt *MockTarget) HandleSCSIWrite(_ uint64) {
+	mt.Handle(pdu.OpSCSICommand, func(tc *TargetConn, _ *transport.RawPDU, decoded pdu.PDU) error {
 		cmd := decoded.(*pdu.SCSICommand)
 		statSN := tc.NextStatSN()
 		resp := &pdu.SCSIResponse{
@@ -732,7 +731,7 @@ func (mt *MockTarget) HandleSCSIWrite(lun uint64) {
 
 // HandleLogout registers a handler for Logout requests.
 func (mt *MockTarget) HandleLogout() {
-	mt.Handle(pdu.OpLogoutReq, func(tc *TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
+	mt.Handle(pdu.OpLogoutReq, func(tc *TargetConn, _ *transport.RawPDU, decoded pdu.PDU) error {
 		req := decoded.(*pdu.LogoutReq)
 		statSN := tc.NextStatSN()
 		resp := &pdu.LogoutResp{
@@ -751,7 +750,7 @@ func (mt *MockTarget) HandleLogout() {
 
 // HandleNOPOut registers a handler for NOP-Out (keepalive) requests.
 func (mt *MockTarget) HandleNOPOut() {
-	mt.Handle(pdu.OpNOPOut, func(tc *TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
+	mt.Handle(pdu.OpNOPOut, func(tc *TargetConn, _ *transport.RawPDU, decoded pdu.PDU) error {
 		req := decoded.(*pdu.NOPOut)
 		statSN := tc.NextStatSN()
 		resp := &pdu.NOPIn{
@@ -772,7 +771,7 @@ func (mt *MockTarget) HandleNOPOut() {
 // HandleTMF registers a handler for Task Management Function requests.
 // Simply responds with TMFResp(Response=0) for all TMF requests.
 func (mt *MockTarget) HandleTMF() {
-	mt.Handle(pdu.OpTaskMgmtReq, func(tc *TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
+	mt.Handle(pdu.OpTaskMgmtReq, func(tc *TargetConn, _ *transport.RawPDU, decoded pdu.PDU) error {
 		req := decoded.(*pdu.TaskMgmtReq)
 		statSN := tc.NextStatSN()
 		resp := &pdu.TaskMgmtResp{
@@ -795,7 +794,7 @@ func (mt *MockTarget) HandleTMF() {
 // the specified status with optional sense data. Useful for testing
 // error recovery paths.
 func (mt *MockTarget) HandleSCSIError(status uint8, senseData []byte) {
-	mt.Handle(pdu.OpSCSICommand, func(tc *TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
+	mt.Handle(pdu.OpSCSICommand, func(tc *TargetConn, _ *transport.RawPDU, decoded pdu.PDU) error {
 		cmd := decoded.(*pdu.SCSICommand)
 		statSN := tc.NextStatSN()
 
@@ -825,10 +824,10 @@ func (mt *MockTarget) HandleSCSIError(status uint8, senseData []byte) {
 // the specified status with optional sense data. Unlike HandleSCSIError, this
 // method uses SessionState.Update for correct CmdSN tracking.
 func (mt *MockTarget) HandleSCSIWithStatus(status uint8, senseData []byte) {
-	mt.Handle(pdu.OpSCSICommand, func(tc *TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
+	mt.Handle(pdu.OpSCSICommand, func(tc *TargetConn, _ *transport.RawPDU, decoded pdu.PDU) error {
 		cmd := decoded.(*pdu.SCSICommand)
 		statSN := tc.NextStatSN()
-		expCmdSN, maxCmdSN := mt.session.Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := mt.session.Update(cmd.CmdSN, cmd.Immediate)
 
 		resp := &pdu.SCSIResponse{
 			Header: pdu.Header{
@@ -847,7 +846,7 @@ func (mt *MockTarget) HandleSCSIWithStatus(status uint8, senseData []byte) {
 			dataSegment := make([]byte, 2+len(senseData))
 			binary.BigEndian.PutUint16(dataSegment[0:2], uint16(len(senseData)))
 			copy(dataSegment[2:], senseData)
-			resp.Header.DataSegmentLen = uint32(len(dataSegment))
+			resp.DataSegmentLen = uint32(len(dataSegment))
 			resp.Data = dataSegment
 		}
 
@@ -858,7 +857,7 @@ func (mt *MockTarget) HandleSCSIWithStatus(status uint8, senseData []byte) {
 // HandleDiscovery registers a TextReq handler that responds with
 // SendTargets discovery data. Used by Discover() tests.
 func (mt *MockTarget) HandleDiscovery(targets []login.KeyValue) {
-	mt.Handle(pdu.OpTextReq, func(tc *TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
+	mt.Handle(pdu.OpTextReq, func(tc *TargetConn, _ *transport.RawPDU, decoded pdu.PDU) error {
 		req := decoded.(*pdu.TextReq)
 		data := login.EncodeTextKV(targets)
 		statSN := tc.NextStatSN()
@@ -883,10 +882,10 @@ func (mt *MockTarget) HandleDiscovery(targets []login.KeyValue) {
 // The last PDU carries HasStatus=true (S-bit) and Final=true (F-bit).
 // DataSN increments from 0. BufferOffset tracks cumulative offset.
 // Uses SessionState for correct ExpCmdSN/MaxCmdSN.
-func (mt *MockTarget) HandleSCSIReadMultiPDU(lun uint64, data []byte, pduSize int) {
-	mt.Handle(pdu.OpSCSICommand, func(tc *TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
+func (mt *MockTarget) HandleSCSIReadMultiPDU(_ uint64, data []byte, pduSize int) {
+	mt.Handle(pdu.OpSCSICommand, func(tc *TargetConn, _ *transport.RawPDU, decoded pdu.PDU) error {
 		cmd := decoded.(*pdu.SCSICommand)
-		expCmdSN, maxCmdSN := mt.session.Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := mt.session.Update(cmd.CmdSN, cmd.Immediate)
 		edtl := int(cmd.ExpectedDataTransferLength)
 		sendLen := edtl
 		if sendLen > len(data) {
@@ -987,7 +986,7 @@ func ReadDataOutPDUs(tc *TargetConn) ([]*pdu.DataOut, error) {
 			continue
 		}
 		result = append(result, dout)
-		if dout.Header.Final {
+		if dout.Final {
 			return result, nil
 		}
 	}

@@ -34,7 +34,7 @@ func TestCmdWindow_ZeroWindow(t *testing.T) {
 		if callCount == 0 {
 			// Close the window: delta=-1 means MaxCmdSN = ExpCmdSN - 1.
 			tgt.Session().SetMaxCmdSNDelta(-1)
-			expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+			expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 			// Send Data-In with status (read response).
 			data := make([]byte, 512)
@@ -80,7 +80,7 @@ func TestCmdWindow_ZeroWindow(t *testing.T) {
 
 		// callCount >= 1: respond normally with open window.
 		tgt.Session().SetMaxCmdSNDelta(10)
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 		data := make([]byte, 512)
 		din := &pdu.DataIn{
 			Header: pdu.Header{
@@ -171,7 +171,7 @@ func TestCmdWindow_LargeWindow(t *testing.T) {
 
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
 		tgt.Session().SetMaxCmdSNDelta(255)
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		// Respond with Data-In carrying 512 bytes.
 		data := make([]byte, 512)
@@ -284,7 +284,7 @@ func TestCmdWindow_WindowOfOne(t *testing.T) {
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
 		// Window of 1: MaxCmdSN = ExpCmdSN (delta=0).
 		tgt.Session().SetMaxCmdSNDelta(0)
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		data := make([]byte, 512)
 		din := &pdu.DataIn{
@@ -410,7 +410,7 @@ func TestCmdWindow_MaxCmdSNInResponse(t *testing.T) {
 		case 0:
 			// First response: open window (delta=10).
 			tgt.Session().SetMaxCmdSNDelta(10)
-			expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+			expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 			data := make([]byte, 512)
 			din := &pdu.DataIn{
 				Header: pdu.Header{
@@ -431,7 +431,7 @@ func TestCmdWindow_MaxCmdSNInResponse(t *testing.T) {
 		case 1:
 			// Second response: close window via SCSI Response (delta=-1).
 			tgt.Session().SetMaxCmdSNDelta(-1)
-			expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+			expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 			data := make([]byte, 512)
 			din := &pdu.DataIn{
 				Header: pdu.Header{
@@ -474,7 +474,7 @@ func TestCmdWindow_MaxCmdSNInResponse(t *testing.T) {
 		default:
 			// callCount >= 2: respond normally with open window.
 			tgt.Session().SetMaxCmdSNDelta(10)
-			expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+			expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 			data := make([]byte, 512)
 			din := &pdu.DataIn{
 				Header: pdu.Header{

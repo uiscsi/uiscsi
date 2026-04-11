@@ -1,5 +1,3 @@
-// types.go defines the public wrapper types for the uiscsi package.
-// All types are defined in the root package to avoid exposing internal types.
 package uiscsi
 
 import (
@@ -77,18 +75,6 @@ type Portal struct {
 	Address  string
 	Port     int
 	GroupTag int
-}
-
-// result carries an intermediate SCSI command outcome used internally by
-// submitAndCheck. Not exported — callers use the typed return values of
-// Session methods, or RawResult/StreamResult for raw CDB pass-through.
-type result struct {
-	status        uint8
-	data          []byte
-	senseData     []byte
-	overflow      bool
-	underflow     bool
-	residualCount uint32
 }
 
 // RawResult carries the raw SCSI command outcome for Execute().

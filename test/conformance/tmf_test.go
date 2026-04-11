@@ -41,7 +41,7 @@ func TestTMF_CmdSN(t *testing.T) {
 	// sent later when the test unblocks the stall channel.
 	stallCh := make(chan struct{})
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 		if callCount == 0 {
 			// Launch goroutine to send response after unblock.
 			go func() {
@@ -85,7 +85,7 @@ func TestTMF_CmdSN(t *testing.T) {
 	// TMF handler: respond with Function Complete and update session state.
 	tgt.Handle(pdu.OpTaskMgmtReq, func(tc *testutil.TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
 		tmf := decoded.(*pdu.TaskMgmtReq)
-		expCmdSN, maxCmdSN := tgt.Session().Update(tmf.CmdSN, tmf.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(tmf.CmdSN, tmf.Immediate)
 		resp := &pdu.TaskMgmtResp{
 			Header: pdu.Header{
 				Final:            true,
@@ -160,7 +160,7 @@ func TestTMF_CmdSN(t *testing.T) {
 	}
 
 	// TMF-01 assertion: Immediate bit is set.
-	if !tmf.Header.Immediate {
+	if !tmf.Immediate {
 		t.Errorf("TMF-01: Immediate bit not set in TMF PDU")
 	}
 
@@ -225,9 +225,9 @@ func TestTMF_LUNEncoding(t *testing.T) {
 
 			// Verify LUN encoding matches EncodeSAMLUN.
 			expected := pdu.EncodeSAMLUN(lun)
-			if tmf.Header.LUN != expected {
+			if tmf.LUN != expected {
 				t.Errorf("TMF-02: LUN encoding for LUN %d: got %x, want %x",
-					lun, tmf.Header.LUN, expected)
+					lun, tmf.LUN, expected)
 			}
 		})
 	}
@@ -263,7 +263,7 @@ func TestTMF_RefCmdSN(t *testing.T) {
 	// AbortTask, while the serve loop remains unblocked.
 	stallCh := make(chan struct{})
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 		if callCount == 0 {
 			go func() {
 				<-stallCh
@@ -305,7 +305,7 @@ func TestTMF_RefCmdSN(t *testing.T) {
 	// TMF handler with session state tracking.
 	tgt.Handle(pdu.OpTaskMgmtReq, func(tc *testutil.TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
 		tmf := decoded.(*pdu.TaskMgmtReq)
-		expCmdSN, maxCmdSN := tgt.Session().Update(tmf.CmdSN, tmf.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(tmf.CmdSN, tmf.Immediate)
 		resp := &pdu.TaskMgmtResp{
 			Header: pdu.Header{
 				Final:            true,
@@ -426,7 +426,7 @@ func TestTMF_AbortTaskSet_AllTasks(t *testing.T) {
 	// Handlers return immediately; responses are sent via goroutine after unblock.
 	stallCh := make(chan struct{})
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 		if callCount <= 1 {
 			go func() {
 				<-stallCh
@@ -469,7 +469,7 @@ func TestTMF_AbortTaskSet_AllTasks(t *testing.T) {
 	var stallOnce sync.Once
 	tgt.Handle(pdu.OpTaskMgmtReq, func(tc *testutil.TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
 		tmf := decoded.(*pdu.TaskMgmtReq)
-		expCmdSN, maxCmdSN := tgt.Session().Update(tmf.CmdSN, tmf.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(tmf.CmdSN, tmf.Immediate)
 
 		// Send Function Complete response.
 		resp := &pdu.TaskMgmtResp{
@@ -579,7 +579,7 @@ func TestTMF_AbortTaskSet_BlocksNew(t *testing.T) {
 	// Stall the first SCSI command by not responding (goroutine pattern).
 	scsiStallCh := make(chan struct{})
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 		if callCount == 0 {
 			go func() {
 				<-scsiStallCh
@@ -623,7 +623,7 @@ func TestTMF_AbortTaskSet_BlocksNew(t *testing.T) {
 	tmfReleaseCh := make(chan struct{})
 	tgt.Handle(pdu.OpTaskMgmtReq, func(tc *testutil.TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
 		tmf := decoded.(*pdu.TaskMgmtReq)
-		expCmdSN, maxCmdSN := tgt.Session().Update(tmf.CmdSN, tmf.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(tmf.CmdSN, tmf.Immediate)
 
 		// Wait in goroutine for test to signal, then send response.
 		// We must NOT block the serve loop, but we also want to delay the
@@ -751,7 +751,7 @@ func TestTMF_AbortTaskSet_ResponseAfterClear(t *testing.T) {
 	// Stall the first SCSI command (goroutine pattern).
 	stallCh := make(chan struct{})
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 		if callCount == 0 {
 			go func() {
 				<-stallCh
@@ -794,7 +794,7 @@ func TestTMF_AbortTaskSet_ResponseAfterClear(t *testing.T) {
 	var tmfOnce sync.Once
 	tgt.Handle(pdu.OpTaskMgmtReq, func(tc *testutil.TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
 		tmf := decoded.(*pdu.TaskMgmtReq)
-		expCmdSN, maxCmdSN := tgt.Session().Update(tmf.CmdSN, tmf.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(tmf.CmdSN, tmf.Immediate)
 
 		resp := &pdu.TaskMgmtResp{
 			Header: pdu.Header{
@@ -872,7 +872,7 @@ func TestTMF_AbortTaskSet_ResponseAfterClear(t *testing.T) {
 	// Verify the LUN encoding in the AbortTaskSet PDU.
 	tmf := tmfPDUs[0].Decoded.(*pdu.TaskMgmtReq)
 	expectedLUN := pdu.EncodeSAMLUN(0)
-	if tmf.Header.LUN != expectedLUN {
-		t.Errorf("TMF-06: LUN encoding: got %x, want %x", tmf.Header.LUN, expectedLUN)
+	if tmf.LUN != expectedLUN {
+		t.Errorf("TMF-06: LUN encoding: got %x, want %x", tmf.LUN, expectedLUN)
 	}
 }

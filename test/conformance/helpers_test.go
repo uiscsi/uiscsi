@@ -86,7 +86,7 @@ func negotiationOverrides(cfg testutil.NegotiationConfig) map[string]string {
 // Data-Out PDUs until the F-bit. It returns the current ExpCmdSN/MaxCmdSN
 // from the target session state for use in subsequent response PDUs.
 func sendR2TAndConsume(tc *testutil.TargetConn, tgt *testutil.MockTarget, cmd *pdu.SCSICommand, ttt uint32, offset uint32, length uint32) (expCmdSN, maxCmdSN uint32, err error) {
-	expCmdSN, maxCmdSN = tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+	expCmdSN, maxCmdSN = tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 	r2t := &pdu.R2T{
 		Header: pdu.Header{

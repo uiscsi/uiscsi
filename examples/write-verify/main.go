@@ -17,9 +17,13 @@ import (
 )
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	if len(os.Args) < 3 {
 		fmt.Fprintf(os.Stderr, "usage: %s <target-address> <target-iqn>\n", os.Args[0])
-		os.Exit(1)
+		return 1
 	}
 	addr := os.Args[1]
 	iqn := os.Args[2]
@@ -30,14 +34,16 @@ func main() {
 		uiscsi.WithTarget(iqn),
 	)
 	if err != nil {
-		log.Fatalf("dial: %v", err)
+		log.Printf("dial: %v", err)
+		return 1
 	}
-	defer sess.Close()
+	defer func() { _ = sess.Close() }()
 
 	// Step 2: Read capacity to get block size.
-	cap, err := sess.ReadCapacity(ctx, 0)
-	if err != nil {
-		log.Fatalf("read capacity: %v", err)
+	cap, capErr := sess.SCSI().ReadCapacity(ctx, 0)
+	if capErr != nil {
+		log.Printf("read capacity: %v", capErr)
+		return 1
 	}
 	fmt.Printf("Block size: %d bytes\n", cap.BlockSize)
 
@@ -46,22 +52,24 @@ func main() {
 	for i := range pattern {
 		pattern[i] = 0xAA
 	}
-	if err := sess.WriteBlocks(ctx, 0, 0, 1, cap.BlockSize, pattern); err != nil {
-		log.Fatalf("write: %v", err)
+	if writeErr := sess.SCSI().WriteBlocks(ctx, 0, 0, 1, cap.BlockSize, pattern); writeErr != nil {
+		log.Printf("write: %v", writeErr)
+		return 1
 	}
 	fmt.Printf("Wrote %d bytes of 0xAA to LBA 0\n", cap.BlockSize)
 
 	// Step 4: Read back LBA 0.
-	readback, err := sess.ReadBlocks(ctx, 0, 0, 1, cap.BlockSize)
-	if err != nil {
-		log.Fatalf("read: %v", err)
+	readback, readErr := sess.SCSI().ReadBlocks(ctx, 0, 0, 1, cap.BlockSize)
+	if readErr != nil {
+		log.Printf("read: %v", readErr)
+		return 1
 	}
 
 	// Step 5: Compare written vs read data.
 	if bytes.Equal(pattern, readback) {
 		fmt.Println("Verification: PASSED -- written data matches readback")
-	} else {
-		fmt.Println("Verification: FAILED -- data mismatch")
-		os.Exit(1)
+		return 0
 	}
+	fmt.Println("Verification: FAILED -- data mismatch")
+	return 1
 }

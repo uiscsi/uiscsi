@@ -105,7 +105,7 @@ func Dial(ctx context.Context, addr string, opts ...Option) (*Session, error) {
 	// Step 2: iSCSI login.
 	params, err := login.Login(ctx, tc, cfg.loginOpts...)
 	if err != nil {
-		tc.Close()
+		_ = tc.Close()
 		// Check for auth failure: LoginError with StatusClass == 2.
 		var le *login.LoginError
 		if errors.As(err, &le) && le.StatusClass == 2 {

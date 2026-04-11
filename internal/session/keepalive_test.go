@@ -207,7 +207,7 @@ func TestAsyncEventCallback(t *testing.T) {
 // writeNOPInPDU encodes and writes a NOP-In PDU to the target conn.
 func writeNOPInPDU(t *testing.T, conn net.Conn, nopin *pdu.NOPIn) {
 	t.Helper()
-	nopin.Header.OpCode_ = pdu.OpNOPIn
+	nopin.OpCode_ = pdu.OpNOPIn
 	raw := buildRawPDU(t, nopin)
 	if err := transport.WriteRawPDU(conn, raw); err != nil {
 		t.Fatalf("write NOP-In: %v", err)
@@ -217,7 +217,7 @@ func writeNOPInPDU(t *testing.T, conn net.Conn, nopin *pdu.NOPIn) {
 // writeAsyncMsgPDU encodes and writes an AsyncMsg PDU to the target conn.
 func writeAsyncMsgPDU(t *testing.T, conn net.Conn, async *pdu.AsyncMsg) {
 	t.Helper()
-	async.Header.OpCode_ = pdu.OpAsyncMsg
+	async.OpCode_ = pdu.OpAsyncMsg
 	raw := buildRawPDU(t, async)
 	if err := transport.WriteRawPDU(conn, raw); err != nil {
 		t.Fatalf("write AsyncMsg: %v", err)

@@ -121,7 +121,7 @@ func (s *Session) handleTargetRequestedLogout(evt AsyncEvent) {
 	if err := s.logout(ctx, 0); err != nil {
 		s.cfg.logger.Warn("session: target-requested logout failed", "error", err)
 	}
-	s.Close()
+	_ = s.Close()
 }
 
 // renegotiate initiates a Text Request exchange to renegotiate operational

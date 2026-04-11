@@ -38,7 +38,7 @@ func TestAsync_LogoutRequest(t *testing.T) {
 
 	// HandleSCSIFunc: on first SCSI command, respond then inject AsyncMsg code 1.
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		resp := &pdu.SCSIResponse{
 			Header: pdu.Header{
@@ -147,7 +147,7 @@ func TestAsync_ConnectionDrop(t *testing.T) {
 	asyncInjected := make(chan struct{})
 
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		resp := &pdu.SCSIResponse{
 			Header: pdu.Header{
@@ -249,7 +249,7 @@ func TestAsync_SessionDrop(t *testing.T) {
 	asyncInjected := make(chan struct{})
 
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		resp := &pdu.SCSIResponse{
 			Header: pdu.Header{
@@ -353,7 +353,7 @@ func TestAsync_NegotiationRequest(t *testing.T) {
 	asyncInjected := make(chan struct{})
 
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		resp := &pdu.SCSIResponse{
 			Header: pdu.Header{
@@ -444,12 +444,12 @@ func TestAsync_NegotiationRequest(t *testing.T) {
 	textReq := textReqs[0].Decoded.(*pdu.TextReq)
 
 	// Final = true (single text exchange).
-	if !textReq.Header.Final {
+	if !textReq.Final {
 		t.Error("TextReq Final: got false, want true")
 	}
 
 	// ITT must be valid (not reserved).
-	if textReq.Header.InitiatorTaskTag == 0xFFFFFFFF {
+	if textReq.InitiatorTaskTag == 0xFFFFFFFF {
 		t.Error("TextReq ITT: got 0xFFFFFFFF, want valid task tag")
 	}
 

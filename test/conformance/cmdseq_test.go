@@ -28,7 +28,7 @@ func TestCmdSN_SequentialIncrement(t *testing.T) {
 	tgt.HandleLogout()
 	tgt.HandleNOPOut()
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 		resp := &pdu.SCSIResponse{
 			Header: pdu.Header{
 				Final:            true,
@@ -80,7 +80,7 @@ func TestCmdSN_SequentialIncrement(t *testing.T) {
 	// Verify none of the SCSI commands have Immediate flag set.
 	for i, c := range cmds {
 		cmd := c.Decoded.(*pdu.SCSICommand)
-		if cmd.Header.Immediate {
+		if cmd.Immediate {
 			t.Errorf("SCSI command[%d] has Immediate=true, want false", i)
 		}
 	}
@@ -108,7 +108,7 @@ func TestCmdSN_ImmediateDelivery_NonTMF(t *testing.T) {
 	// hardcodes CmdSN+1.
 	tgt.Handle(pdu.OpNOPOut, func(tc *testutil.TargetConn, raw *transport.RawPDU, decoded pdu.PDU) error {
 		req := decoded.(*pdu.NOPOut)
-		expCmdSN, maxCmdSN := tgt.Session().Update(req.CmdSN, req.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(req.CmdSN, req.Immediate)
 		resp := &pdu.NOPIn{
 			Header: pdu.Header{
 				Final:            true,
@@ -124,7 +124,7 @@ func TestCmdSN_ImmediateDelivery_NonTMF(t *testing.T) {
 	})
 
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 		resp := &pdu.SCSIResponse{
 			Header: pdu.Header{
 				Final:            true,
@@ -189,7 +189,7 @@ func TestCmdSN_ImmediateDelivery_NonTMF(t *testing.T) {
 	}
 	for i, n := range nops {
 		nopOut := n.Decoded.(*pdu.NOPOut)
-		if !nopOut.Header.Immediate {
+		if !nopOut.Immediate {
 			t.Errorf("NOP-Out[%d] has Immediate=false, want true", i)
 		}
 	}
@@ -226,7 +226,7 @@ func TestCmdSN_ImmediateDelivery_TMF(t *testing.T) {
 	tgt.HandleNOPOut()
 	tgt.HandleTMF()
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 		resp := &pdu.SCSIResponse{
 			Header: pdu.Header{
 				Final:            true,
@@ -274,7 +274,7 @@ func TestCmdSN_ImmediateDelivery_TMF(t *testing.T) {
 	}
 	for i, tm := range tmfs {
 		tmfReq := tm.Decoded.(*pdu.TaskMgmtReq)
-		if !tmfReq.Header.Immediate {
+		if !tmfReq.Immediate {
 			t.Errorf("TaskMgmtReq[%d] has Immediate=false, want true", i)
 		}
 	}

@@ -1,4 +1,3 @@
-// options.go defines functional options for Dial and Discover.
 package uiscsi
 
 import (

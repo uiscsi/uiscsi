@@ -17,9 +17,13 @@ import (
 )
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	if len(os.Args) < 3 {
 		fmt.Fprintf(os.Stderr, "usage: %s <target-address> <target-iqn>\n", os.Args[0])
-		os.Exit(1)
+		return 1
 	}
 	addr := os.Args[1]
 	iqn := os.Args[2]
@@ -65,12 +69,13 @@ func main() {
 		uiscsi.WithTarget(iqn),
 	)
 	if err != nil {
-		log.Fatalf("dial: %v", err)
+		log.Printf("dial: %v", err)
+		return 1
 	}
-	defer sess.Close()
+	defer func() { _ = sess.Close() }()
 
 	// Read from a high LUN number that likely does not exist.
-	_, err = sess.ReadBlocks(ctx, 255, 0, 1, 512)
+	_, err = sess.SCSI().ReadBlocks(ctx, 255, 0, 1, 512)
 	if err != nil {
 		var scsiErr *uiscsi.SCSIError
 		if errors.As(err, &scsiErr) {
@@ -100,7 +105,7 @@ func main() {
 	fmt.Println("Retry logic for CHECK CONDITION / UNIT ATTENTION:")
 	const maxRetries = 3
 	for attempt := range maxRetries {
-		err = sess.TestUnitReady(ctx, 0)
+		err = sess.SCSI().TestUnitReady(ctx, 0)
 		if err == nil {
 			fmt.Printf("  Attempt %d: success\n", attempt+1)
 			break
@@ -114,4 +119,5 @@ func main() {
 		fmt.Printf("  Attempt %d: non-retryable error: %v\n", attempt+1, err)
 		break
 	}
+	return 0
 }

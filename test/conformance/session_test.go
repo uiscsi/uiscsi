@@ -33,7 +33,7 @@ func TestSession_LogoutAfterAsyncEvent1(t *testing.T) {
 
 	// HandleSCSIFunc: on first call, send SCSI response then inject AsyncMsg code 1.
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		// Always send SCSI response first.
 		resp := &pdu.SCSIResponse{
@@ -127,23 +127,23 @@ func TestSession_LogoutAfterAsyncEvent1(t *testing.T) {
 	}
 
 	// Final = true.
-	if !logout.Header.Final {
+	if !logout.Final {
 		t.Error("Final: got false, want true")
 	}
 
 	// ITT is valid (non-reserved).
-	if logout.Header.InitiatorTaskTag == 0xFFFFFFFF {
+	if logout.InitiatorTaskTag == 0xFFFFFFFF {
 		t.Error("ITT: got 0xFFFFFFFF, want valid task tag")
 	}
 
 	// DataSegmentLen = 0.
-	if logout.Header.DataSegmentLen != 0 {
-		t.Errorf("DataSegmentLen: got %d, want 0", logout.Header.DataSegmentLen)
+	if logout.DataSegmentLen != 0 {
+		t.Errorf("DataSegmentLen: got %d, want 0", logout.DataSegmentLen)
 	}
 
 	// TotalAHSLength = 0.
-	if logout.Header.TotalAHSLength != 0 {
-		t.Errorf("TotalAHSLength: got %d, want 0", logout.Header.TotalAHSLength)
+	if logout.TotalAHSLength != 0 {
+		t.Errorf("TotalAHSLength: got %d, want 0", logout.TotalAHSLength)
 	}
 
 	// CmdSN is valid (non-zero, incremented from SCSI command).
@@ -186,7 +186,7 @@ func TestSession_CleanLogout(t *testing.T) {
 
 	// HandleSCSIFunc: standard response.
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 		resp := &pdu.SCSIResponse{
 			Header: pdu.Header{
 				Final:            true,
@@ -242,12 +242,12 @@ func TestSession_CleanLogout(t *testing.T) {
 	}
 
 	// Final = true.
-	if !logout.Header.Final {
+	if !logout.Final {
 		t.Error("Final: got false, want true")
 	}
 
 	// ITT is valid (non-reserved).
-	if logout.Header.InitiatorTaskTag == 0xFFFFFFFF {
+	if logout.InitiatorTaskTag == 0xFFFFFFFF {
 		t.Error("ITT: got 0xFFFFFFFF, want valid task tag")
 	}
 
@@ -263,7 +263,7 @@ func TestSession_CleanLogout(t *testing.T) {
 	}
 
 	// DataSegmentLen = 0.
-	if logout.Header.DataSegmentLen != 0 {
-		t.Errorf("DataSegmentLen: got %d, want 0", logout.Header.DataSegmentLen)
+	if logout.DataSegmentLen != 0 {
+		t.Errorf("DataSegmentLen: got %d, want 0", logout.DataSegmentLen)
 	}
 }

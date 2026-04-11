@@ -122,7 +122,7 @@ func (s *Session) handleUnsolicitedNOPIn(raw *transport.RawPDU) {
 				Immediate:        true,
 				Final:            true,
 				InitiatorTaskTag: 0xFFFFFFFF, // response, not new task
-				LUN:              nopin.Header.LUN, // Echo LUN from NOP-In per RFC 7143 S11.18
+				LUN:              nopin.LUN, // Echo LUN from NOP-In per RFC 7143 S11.18
 			},
 			TargetTransferTag: nopin.TargetTransferTag,
 			CmdSN:             s.window.current(),
@@ -132,7 +132,7 @@ func (s *Session) handleUnsolicitedNOPIn(raw *transport.RawPDU) {
 		// Echo ping data if present.
 		if len(raw.DataSegment) > 0 {
 			nopOut.Data = raw.DataSegment
-			nopOut.Header.DataSegmentLen = uint32(len(raw.DataSegment))
+			nopOut.DataSegmentLen = uint32(len(raw.DataSegment))
 		}
 
 		bhs, err := nopOut.MarshalBHS()

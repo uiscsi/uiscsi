@@ -36,7 +36,7 @@ func TestDataIn_StatusInFinal(t *testing.T) {
 	}
 
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		// Send 3 Data-In PDUs of 512 bytes each.
 		for i := range 3 {
@@ -97,8 +97,8 @@ func TestDataIn_StatusInFinal(t *testing.T) {
 		din := cap.Decoded.(*pdu.DataIn)
 		isFinal := i == 2
 
-		if din.Header.Final != isFinal {
-			t.Errorf("DataIn[%d] Final=%v, want %v", i, din.Header.Final, isFinal)
+		if din.Final != isFinal {
+			t.Errorf("DataIn[%d] Final=%v, want %v", i, din.Final, isFinal)
 		}
 		if din.HasStatus != isFinal {
 			t.Errorf("DataIn[%d] HasStatus=%v, want %v", i, din.HasStatus, isFinal)
@@ -136,7 +136,7 @@ func TestDataIn_ABitDataACK(t *testing.T) {
 	}
 
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		for i := range 3 {
 			offset := uint32(i * 512)
@@ -248,7 +248,7 @@ func TestDataIn_ZeroLength(t *testing.T) {
 	}
 
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		// First PDU: 512 bytes of data, not final.
 		din1 := &pdu.DataIn{
@@ -314,8 +314,8 @@ func TestDataIn_ZeroLength(t *testing.T) {
 
 	// Second PDU should have zero-length data segment on the wire.
 	lastDin := dins[1].Decoded.(*pdu.DataIn)
-	if lastDin.Header.DataSegmentLen != 0 {
-		t.Errorf("final Data-In DataSegmentLen=%d, want 0", lastDin.Header.DataSegmentLen)
+	if lastDin.DataSegmentLen != 0 {
+		t.Errorf("final Data-In DataSegmentLen=%d, want 0", lastDin.DataSegmentLen)
 	}
 	if !lastDin.HasStatus {
 		t.Errorf("final Data-In HasStatus=false, want true")
@@ -346,7 +346,7 @@ func TestDataIn_EDTL(t *testing.T) {
 	}
 
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		for i := range 4 {
 			offset := uint32(i * 256)
@@ -413,7 +413,7 @@ func TestDataIn_EDTL(t *testing.T) {
 	var totalRecv uint32
 	for _, cap := range dins {
 		din := cap.Decoded.(*pdu.DataIn)
-		totalRecv += din.Header.DataSegmentLen
+		totalRecv += din.DataSegmentLen
 	}
 
 	if totalRecv != edtl {

@@ -145,9 +145,9 @@ func TestParsePortal(t *testing.T) {
 // writeTextRespPDU builds and writes a TextResp PDU to the conn.
 func writeTextRespPDU(t *testing.T, conn net.Conn, resp *pdu.TextResp) {
 	t.Helper()
-	resp.Header.OpCode_ = pdu.OpTextResp
-	resp.Header.Final = !resp.Continue
-	resp.Header.DataSegmentLen = uint32(len(resp.Data))
+	resp.OpCode_ = pdu.OpTextResp
+	resp.Final = !resp.Continue
+	resp.DataSegmentLen = uint32(len(resp.Data))
 	raw := buildRawPDU(t, resp)
 	if err := transport.WriteRawPDU(conn, raw); err != nil {
 		t.Fatalf("write TextResp: %v", err)
@@ -348,8 +348,8 @@ func TestDiscoverIntegration(t *testing.T) {
 			ExpCmdSN:      1,
 			MaxCmdSN:      10,
 		}
-		loginResp.Header.OpCode_ = pdu.OpLoginResp
-		loginResp.Header.DataSegmentLen = 0
+		loginResp.OpCode_ = pdu.OpLoginResp
+		loginResp.DataSegmentLen = 0
 		loginBHS, _ := loginResp.MarshalBHS()
 		if writeErr := transport.WriteRawPDU(conn, &transport.RawPDU{BHS: loginBHS}); writeErr != nil {
 			t.Logf("mock target: write login resp: %v", writeErr)
@@ -400,7 +400,7 @@ func TestDiscoverIntegration(t *testing.T) {
 			MaxCmdSN:      10,
 			Data:          opRespData,
 		}
-		opResp.Header.OpCode_ = pdu.OpLoginResp
+		opResp.OpCode_ = pdu.OpLoginResp
 		opBHS, _ := opResp.MarshalBHS()
 		opPDU := &transport.RawPDU{BHS: opBHS}
 		if len(opRespData) > 0 {
@@ -432,7 +432,7 @@ func TestDiscoverIntegration(t *testing.T) {
 			MaxCmdSN:          textReq.CmdSN + 10,
 			Data:              targetData,
 		}
-		textResp.Header.OpCode_ = pdu.OpTextResp
+		textResp.OpCode_ = pdu.OpTextResp
 		textBHS, _ := textResp.MarshalBHS()
 		textPDU := &transport.RawPDU{BHS: textBHS}
 		if len(targetData) > 0 {
@@ -462,7 +462,7 @@ func TestDiscoverIntegration(t *testing.T) {
 			ExpCmdSN: logoutReq.CmdSN + 1,
 			MaxCmdSN: logoutReq.CmdSN + 10,
 		}
-		logoutResp.Header.OpCode_ = pdu.OpLogoutResp
+		logoutResp.OpCode_ = pdu.OpLogoutResp
 		logoutBHS, _ := logoutResp.MarshalBHS()
 		if writeErr := transport.WriteRawPDU(conn, &transport.RawPDU{BHS: logoutBHS}); writeErr != nil {
 			t.Logf("mock target: write logout resp: %v", writeErr)

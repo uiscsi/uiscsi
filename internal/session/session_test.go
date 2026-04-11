@@ -97,9 +97,9 @@ func newTestSession(t *testing.T) (*Session, net.Conn) {
 // writeDataInPDU encodes and writes a Data-In PDU to the target conn.
 func writeDataInPDU(t *testing.T, conn net.Conn, din *pdu.DataIn) {
 	t.Helper()
-	din.Header.OpCode_ = pdu.OpDataIn
-	din.Header.Final = true
-	din.Header.DataSegmentLen = uint32(len(din.Data))
+	din.OpCode_ = pdu.OpDataIn
+	din.Final = true
+	din.DataSegmentLen = uint32(len(din.Data))
 	raw := buildRawPDU(t, din)
 	if err := transport.WriteRawPDU(conn, raw); err != nil {
 		t.Fatalf("write DataIn: %v", err)
@@ -109,9 +109,9 @@ func writeDataInPDU(t *testing.T, conn net.Conn, din *pdu.DataIn) {
 // writeSCSIResponsePDU encodes and writes a SCSIResponse PDU to the target conn.
 func writeSCSIResponsePDU(t *testing.T, conn net.Conn, resp *pdu.SCSIResponse) {
 	t.Helper()
-	resp.Header.OpCode_ = pdu.OpSCSIResponse
-	resp.Header.Final = true
-	resp.Header.DataSegmentLen = uint32(len(resp.Data))
+	resp.OpCode_ = pdu.OpSCSIResponse
+	resp.Final = true
+	resp.DataSegmentLen = uint32(len(resp.Data))
 	raw := buildRawPDU(t, resp)
 	if err := transport.WriteRawPDU(conn, raw); err != nil {
 		t.Fatalf("write SCSIResponse: %v", err)

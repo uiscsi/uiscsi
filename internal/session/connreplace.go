@@ -21,7 +21,7 @@ func (s *Session) replaceConnection(cause error) error {
 	// Step 1: Stop old pumps. Cancel context first, then close connection
 	// to unblock any blocked reads/writes, then wait for goroutines to exit.
 	s.cancel()
-	s.conn.Close()
+	_ = s.conn.Close()
 
 	// Wait for dispatchLoop to exit (it closes s.done on return).
 	// This ensures all old goroutines are done accessing s.writeCh/s.unsolCh
@@ -62,7 +62,7 @@ func (s *Session) replaceConnection(cause error) error {
 
 	newParams, err := login.Login(ctx, newTc, loginOpts...)
 	if err != nil {
-		newTc.Close()
+		_ = newTc.Close()
 		return fmt.Errorf("session: ERL 2 login failed: %w", err)
 	}
 

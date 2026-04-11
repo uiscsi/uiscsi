@@ -338,7 +338,7 @@ func TestError_CRCErrorSense(t *testing.T) {
 	senseData[13] = 0x05 // ASCQ: CRC ERROR DETECTED
 
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		// Build data segment: [SenseLength (2 bytes BE)] [Sense Data]
 		dataSegment := make([]byte, 2+len(senseData))
@@ -421,7 +421,7 @@ func TestError_SNACKRejectNewCommand(t *testing.T) {
 	})
 
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		if callCount == 0 {
 			// First command: send Data-In with DataSN gap to trigger SNACK.

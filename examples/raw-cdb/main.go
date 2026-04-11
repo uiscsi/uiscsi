@@ -16,9 +16,13 @@ import (
 )
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	if len(os.Args) < 3 {
 		fmt.Fprintf(os.Stderr, "usage: %s <target-address> <target-iqn>\n", os.Args[0])
-		os.Exit(1)
+		return 1
 	}
 	addr := os.Args[1]
 	iqn := os.Args[2]
@@ -29,27 +33,30 @@ func main() {
 		uiscsi.WithTarget(iqn),
 	)
 	if err != nil {
-		log.Fatalf("dial: %v", err)
+		log.Printf("dial: %v", err)
+		return 1
 	}
-	defer sess.Close()
+	defer func() { _ = sess.Close() }()
 
 	// Example 1: TEST UNIT READY (opcode 0x00, 6-byte CDB).
 	// No data transfer -- just checks if the LUN is ready.
 	turCDB := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
-	result, err := sess.Execute(ctx, 0, turCDB)
+	result, err := sess.Raw().Execute(ctx, 0, turCDB)
 	if err != nil {
-		log.Fatalf("TEST UNIT READY: %v", err)
+		log.Printf("TEST UNIT READY: %v", err)
+		return 1
 	}
 	fmt.Printf("TEST UNIT READY: status=0x%02X\n", result.Status)
 
 	// Example 2: INQUIRY (opcode 0x12, 6-byte CDB).
 	// Requests up to 255 bytes of inquiry data.
 	inquiryCDB := []byte{0x12, 0x00, 0x00, 0x00, 0xFF, 0x00}
-	result, err = sess.Execute(ctx, 0, inquiryCDB,
+	result, err = sess.Raw().Execute(ctx, 0, inquiryCDB,
 		uiscsi.WithDataIn(255),
 	)
 	if err != nil {
-		log.Fatalf("INQUIRY: %v", err)
+		log.Printf("INQUIRY: %v", err)
+		return 1
 	}
 	fmt.Printf("INQUIRY: status=0x%02X, %d bytes returned\n", result.Status, len(result.Data))
 	if len(result.Data) >= 36 {
@@ -65,11 +72,13 @@ func main() {
 	// This shows how you would construct any arbitrary CDB.
 	// Here we build a READ CAPACITY(10) manually (opcode 0x25).
 	readCapCDB := []byte{0x25, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
-	result, err = sess.Execute(ctx, 0, readCapCDB,
+	result, err = sess.Raw().Execute(ctx, 0, readCapCDB,
 		uiscsi.WithDataIn(8), // READ CAPACITY(10) returns 8 bytes
 	)
 	if err != nil {
-		log.Fatalf("READ CAPACITY(10): %v", err)
+		log.Printf("READ CAPACITY(10): %v", err)
+		return 1
 	}
 	fmt.Printf("READ CAPACITY(10): status=0x%02X, data=%x\n", result.Status, result.Data)
+	return 0
 }

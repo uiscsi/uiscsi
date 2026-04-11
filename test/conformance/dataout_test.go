@@ -34,7 +34,7 @@ func TestDataOut_DataSN(t *testing.T) {
 	tgt.HandleLogout()
 	tgt.HandleNOPOut()
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		// Send single R2T for full EDTL (2048 bytes).
 		r2t := &pdu.R2T{
@@ -134,7 +134,7 @@ func TestDataOut_TTTEcho(t *testing.T) {
 	tgt.HandleLogout()
 	tgt.HandleNOPOut()
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		// Use distinctive TTT value.
 		r2t := &pdu.R2T{
@@ -227,7 +227,7 @@ func TestDataOut_MaxRecvDSL(t *testing.T) {
 	tgt.HandleLogout()
 	tgt.HandleNOPOut()
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		r2t := &pdu.R2T{
 			Header: pdu.Header{
@@ -319,7 +319,7 @@ func TestDataOut_FBitSolicited(t *testing.T) {
 	tgt.HandleLogout()
 	tgt.HandleNOPOut()
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		// R2T for 1536 bytes -> 3 PDUs at 512.
 		r2t := &pdu.R2T{
@@ -385,8 +385,8 @@ func TestDataOut_FBitSolicited(t *testing.T) {
 	for i, c := range douts {
 		dout := c.Decoded.(*pdu.DataOut)
 		expectFinal := i == len(douts)-1
-		if dout.Header.Final != expectFinal {
-			t.Errorf("DataOut[%d].Final=%v, want %v", i, dout.Header.Final, expectFinal)
+		if dout.Final != expectFinal {
+			t.Errorf("DataOut[%d].Final=%v, want %v", i, dout.Final, expectFinal)
 		}
 	}
 }
@@ -414,7 +414,7 @@ func TestDataOut_DataSNPerR2T(t *testing.T) {
 	tgt.HandleLogout()
 	tgt.HandleNOPOut()
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		// Send 2 R2Ts with distinct TTTs, each for 1024 bytes.
 		ttts, err := testutil.SendR2TSequence(tc, cmd.InitiatorTaskTag,
@@ -523,7 +523,7 @@ func TestDataOut_BufferOffset(t *testing.T) {
 	tgt.HandleLogout()
 	tgt.HandleNOPOut()
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		r2t := &pdu.R2T{
 			Header: pdu.Header{
@@ -619,7 +619,7 @@ func TestDataOut_UnsolicitedFirstBurst(t *testing.T) {
 	tgt.HandleLogout()
 	tgt.HandleNOPOut()
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		// SCSI Command carries immediate data. Read unsolicited Data-Out until F-bit.
 		unsolicited, err := testutil.ReadDataOutPDUs(tc)
@@ -739,7 +739,7 @@ func TestDataOut_NoUnsolicited(t *testing.T) {
 	tgt.HandleLogout()
 	tgt.HandleNOPOut()
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		r2t := &pdu.R2T{
 			Header: pdu.Header{
@@ -840,7 +840,7 @@ func TestDataOut_FirstBurstLimit(t *testing.T) {
 	tgt.HandleLogout()
 	tgt.HandleNOPOut()
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		// Read unsolicited Data-Out until F-bit.
 		unsolicited, err := testutil.ReadDataOutPDUs(tc)
@@ -964,7 +964,7 @@ func TestDataOut_FBitUnsolicited(t *testing.T) {
 	tgt.HandleLogout()
 	tgt.HandleNOPOut()
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		// Read unsolicited Data-Out until F-bit.
 		unsolicited, err := testutil.ReadDataOutPDUs(tc)
@@ -1048,8 +1048,8 @@ func TestDataOut_FBitUnsolicited(t *testing.T) {
 	for i, c := range unsolicited {
 		dout := c.Decoded.(*pdu.DataOut)
 		expectFinal := i == len(unsolicited)-1
-		if dout.Header.Final != expectFinal {
-			t.Errorf("unsolicited DataOut[%d].Final=%v, want %v", i, dout.Header.Final, expectFinal)
+		if dout.Final != expectFinal {
+			t.Errorf("unsolicited DataOut[%d].Final=%v, want %v", i, dout.Final, expectFinal)
 		}
 	}
 }

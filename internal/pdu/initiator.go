@@ -13,12 +13,12 @@ type NOPOut struct {
 	Data              []byte // Ping data
 }
 
-func (p *NOPOut) Opcode() OpCode       { return OpNOPOut }
+func (*NOPOut) Opcode() OpCode       { return OpNOPOut }
 func (p *NOPOut) DataSegment() []byte   { return p.Data }
 func (p *NOPOut) MarshalBHS() ([BHSLength]byte, error) {
 	var bhs [BHSLength]byte
-	p.Header.OpCode_ = OpNOPOut
-	if err := p.Header.marshalHeader(bhs[:]); err != nil {
+	p.OpCode_ = OpNOPOut
+	if err := p.marshalHeader(bhs[:]); err != nil {
 		return bhs, err
 	}
 	binary.BigEndian.PutUint32(bhs[20:24], p.TargetTransferTag)
@@ -27,7 +27,7 @@ func (p *NOPOut) MarshalBHS() ([BHSLength]byte, error) {
 	return bhs, nil
 }
 func (p *NOPOut) UnmarshalBHS(bhs [BHSLength]byte) {
-	p.Header.unmarshalHeader(bhs)
+	p.unmarshalHeader(bhs)
 	p.TargetTransferTag = binary.BigEndian.Uint32(bhs[20:24])
 	p.CmdSN = binary.BigEndian.Uint32(bhs[24:28])
 	p.ExpStatSN = binary.BigEndian.Uint32(bhs[28:32])
@@ -47,12 +47,12 @@ type SCSICommand struct {
 	ImmediateData              []byte
 }
 
-func (p *SCSICommand) Opcode() OpCode       { return OpSCSICommand }
+func (*SCSICommand) Opcode() OpCode       { return OpSCSICommand }
 func (p *SCSICommand) DataSegment() []byte   { return p.ImmediateData }
 func (p *SCSICommand) MarshalBHS() ([BHSLength]byte, error) {
 	var bhs [BHSLength]byte
-	p.Header.OpCode_ = OpSCSICommand
-	if err := p.Header.marshalHeader(bhs[:]); err != nil {
+	p.OpCode_ = OpSCSICommand
+	if err := p.marshalHeader(bhs[:]); err != nil {
 		return bhs, err
 	}
 	// Flags in byte 1: Final already set by marshalHeader, add R/W/Attr
@@ -70,7 +70,7 @@ func (p *SCSICommand) MarshalBHS() ([BHSLength]byte, error) {
 	return bhs, nil
 }
 func (p *SCSICommand) UnmarshalBHS(bhs [BHSLength]byte) {
-	p.Header.unmarshalHeader(bhs)
+	p.unmarshalHeader(bhs)
 	p.Read = bhs[1]&0x40 != 0
 	p.Write = bhs[1]&0x20 != 0
 	p.Attr = bhs[1] & 0x07
@@ -91,12 +91,12 @@ type TaskMgmtReq struct {
 	RefCmdSN           uint32
 }
 
-func (p *TaskMgmtReq) Opcode() OpCode       { return OpTaskMgmtReq }
-func (p *TaskMgmtReq) DataSegment() []byte   { return nil }
+func (*TaskMgmtReq) Opcode() OpCode       { return OpTaskMgmtReq }
+func (*TaskMgmtReq) DataSegment() []byte   { return nil }
 func (p *TaskMgmtReq) MarshalBHS() ([BHSLength]byte, error) {
 	var bhs [BHSLength]byte
-	p.Header.OpCode_ = OpTaskMgmtReq
-	if err := p.Header.marshalHeader(bhs[:]); err != nil {
+	p.OpCode_ = OpTaskMgmtReq
+	if err := p.marshalHeader(bhs[:]); err != nil {
 		return bhs, err
 	}
 	bhs[1] |= p.Function & 0x7f
@@ -107,7 +107,7 @@ func (p *TaskMgmtReq) MarshalBHS() ([BHSLength]byte, error) {
 	return bhs, nil
 }
 func (p *TaskMgmtReq) UnmarshalBHS(bhs [BHSLength]byte) {
-	p.Header.unmarshalHeader(bhs)
+	p.unmarshalHeader(bhs)
 	p.Function = bhs[1] & 0x7f
 	p.ReferencedTaskTag = binary.BigEndian.Uint32(bhs[20:24])
 	p.CmdSN = binary.BigEndian.Uint32(bhs[24:28])
@@ -133,12 +133,12 @@ type LoginReq struct {
 	Data       []byte // key-value pairs
 }
 
-func (p *LoginReq) Opcode() OpCode       { return OpLoginReq }
+func (*LoginReq) Opcode() OpCode       { return OpLoginReq }
 func (p *LoginReq) DataSegment() []byte   { return p.Data }
 func (p *LoginReq) MarshalBHS() ([BHSLength]byte, error) {
 	var bhs [BHSLength]byte
-	p.Header.OpCode_ = OpLoginReq
-	if err := p.Header.marshalHeader(bhs[:]); err != nil {
+	p.OpCode_ = OpLoginReq
+	if err := p.marshalHeader(bhs[:]); err != nil {
 		return bhs, err
 	}
 	// Byte 1: T, C, CSG, NSG (Final bit position is reused for T)
@@ -163,7 +163,7 @@ func (p *LoginReq) MarshalBHS() ([BHSLength]byte, error) {
 	return bhs, nil
 }
 func (p *LoginReq) UnmarshalBHS(bhs [BHSLength]byte) {
-	p.Header.unmarshalHeader(bhs)
+	p.unmarshalHeader(bhs)
 	p.Transit = bhs[1]&0x80 != 0
 	p.Continue = bhs[1]&0x40 != 0
 	p.CSG = (bhs[1] >> 2) & 0x03
@@ -188,12 +188,12 @@ type TextReq struct {
 	Data              []byte // key-value pairs
 }
 
-func (p *TextReq) Opcode() OpCode       { return OpTextReq }
+func (*TextReq) Opcode() OpCode       { return OpTextReq }
 func (p *TextReq) DataSegment() []byte   { return p.Data }
 func (p *TextReq) MarshalBHS() ([BHSLength]byte, error) {
 	var bhs [BHSLength]byte
-	p.Header.OpCode_ = OpTextReq
-	if err := p.Header.marshalHeader(bhs[:]); err != nil {
+	p.OpCode_ = OpTextReq
+	if err := p.marshalHeader(bhs[:]); err != nil {
 		return bhs, err
 	}
 	if p.Continue {
@@ -205,7 +205,7 @@ func (p *TextReq) MarshalBHS() ([BHSLength]byte, error) {
 	return bhs, nil
 }
 func (p *TextReq) UnmarshalBHS(bhs [BHSLength]byte) {
-	p.Header.unmarshalHeader(bhs)
+	p.unmarshalHeader(bhs)
 	p.Continue = bhs[1]&0x40 != 0
 	p.TargetTransferTag = binary.BigEndian.Uint32(bhs[20:24])
 	p.CmdSN = binary.BigEndian.Uint32(bhs[24:28])
@@ -223,12 +223,12 @@ type DataOut struct {
 	Data              []byte // Write data
 }
 
-func (p *DataOut) Opcode() OpCode       { return OpDataOut }
+func (*DataOut) Opcode() OpCode       { return OpDataOut }
 func (p *DataOut) DataSegment() []byte   { return p.Data }
 func (p *DataOut) MarshalBHS() ([BHSLength]byte, error) {
 	var bhs [BHSLength]byte
-	p.Header.OpCode_ = OpDataOut
-	if err := p.Header.marshalHeader(bhs[:]); err != nil {
+	p.OpCode_ = OpDataOut
+	if err := p.marshalHeader(bhs[:]); err != nil {
 		return bhs, err
 	}
 	binary.BigEndian.PutUint32(bhs[20:24], p.TargetTransferTag)
@@ -238,7 +238,7 @@ func (p *DataOut) MarshalBHS() ([BHSLength]byte, error) {
 	return bhs, nil
 }
 func (p *DataOut) UnmarshalBHS(bhs [BHSLength]byte) {
-	p.Header.unmarshalHeader(bhs)
+	p.unmarshalHeader(bhs)
 	p.TargetTransferTag = binary.BigEndian.Uint32(bhs[20:24])
 	p.ExpStatSN = binary.BigEndian.Uint32(bhs[28:32])
 	p.DataSN = binary.BigEndian.Uint32(bhs[36:40])
@@ -255,12 +255,12 @@ type LogoutReq struct {
 	ExpStatSN  uint32
 }
 
-func (p *LogoutReq) Opcode() OpCode       { return OpLogoutReq }
-func (p *LogoutReq) DataSegment() []byte   { return nil }
+func (*LogoutReq) Opcode() OpCode       { return OpLogoutReq }
+func (*LogoutReq) DataSegment() []byte   { return nil }
 func (p *LogoutReq) MarshalBHS() ([BHSLength]byte, error) {
 	var bhs [BHSLength]byte
-	p.Header.OpCode_ = OpLogoutReq
-	if err := p.Header.marshalHeader(bhs[:]); err != nil {
+	p.OpCode_ = OpLogoutReq
+	if err := p.marshalHeader(bhs[:]); err != nil {
 		return bhs, err
 	}
 	bhs[1] |= p.ReasonCode & 0x7f
@@ -270,7 +270,7 @@ func (p *LogoutReq) MarshalBHS() ([BHSLength]byte, error) {
 	return bhs, nil
 }
 func (p *LogoutReq) UnmarshalBHS(bhs [BHSLength]byte) {
-	p.Header.unmarshalHeader(bhs)
+	p.unmarshalHeader(bhs)
 	p.ReasonCode = bhs[1] & 0x7f
 	p.CID = binary.BigEndian.Uint16(bhs[20:22])
 	p.CmdSN = binary.BigEndian.Uint32(bhs[24:28])
@@ -288,12 +288,12 @@ type SNACKReq struct {
 	RunLength         uint32
 }
 
-func (p *SNACKReq) Opcode() OpCode       { return OpSNACKReq }
-func (p *SNACKReq) DataSegment() []byte   { return nil }
+func (*SNACKReq) Opcode() OpCode       { return OpSNACKReq }
+func (*SNACKReq) DataSegment() []byte   { return nil }
 func (p *SNACKReq) MarshalBHS() ([BHSLength]byte, error) {
 	var bhs [BHSLength]byte
-	p.Header.OpCode_ = OpSNACKReq
-	if err := p.Header.marshalHeader(bhs[:]); err != nil {
+	p.OpCode_ = OpSNACKReq
+	if err := p.marshalHeader(bhs[:]); err != nil {
 		return bhs, err
 	}
 	bhs[1] |= p.Type & 0x0f
@@ -304,7 +304,7 @@ func (p *SNACKReq) MarshalBHS() ([BHSLength]byte, error) {
 	return bhs, nil
 }
 func (p *SNACKReq) UnmarshalBHS(bhs [BHSLength]byte) {
-	p.Header.unmarshalHeader(bhs)
+	p.unmarshalHeader(bhs)
 	p.Type = bhs[1] & 0x0f
 	p.TargetTransferTag = binary.BigEndian.Uint32(bhs[20:24])
 	p.ExpStatSN = binary.BigEndian.Uint32(bhs[28:32])

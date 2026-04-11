@@ -54,7 +54,7 @@ func (s *Session) reconnect(cause error) {
 	// replacing session fields (prevents data race on s.done, s.unsolCh).
 	oldDone := s.done
 	s.cancel()
-	s.conn.Close()
+	_ = s.conn.Close()
 
 	// Wait for old dispatchLoop to exit so no goroutine reads replaced fields.
 	<-oldDone
@@ -111,7 +111,7 @@ func (s *Session) reconnect(cause error) {
 			var le *login.LoginError
 			if errors.As(err, &le) && le.StatusClass == 2 {
 				cancel()
-				tc.Close()
+				_ = tc.Close()
 
 				// Re-dial for fresh session login.
 				ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
@@ -132,7 +132,7 @@ func (s *Session) reconnect(cause error) {
 				params, err = login.Login(ctx2, tc2, freshOpts...)
 				cancel2()
 				if err != nil {
-					tc2.Close()
+					_ = tc2.Close()
 					lastErr = err
 					s.cfg.logger.Warn("session: reconnect fresh login failed",
 						"attempt", attempt+1, "error", err)
@@ -141,7 +141,7 @@ func (s *Session) reconnect(cause error) {
 				tc = tc2
 			} else {
 				cancel()
-				tc.Close()
+				_ = tc.Close()
 				lastErr = err
 				s.cfg.logger.Warn("session: reconnect login failed",
 					"attempt", attempt+1, "error", err)
@@ -291,7 +291,7 @@ func (s *Session) retryTasks(ctx context.Context, tasks map[uint32]*task) {
 			CDB:                        cmd.CDB,
 			ImmediateData:              immediateData,
 		}
-		scsiCmd.Header.LUN = pdu.EncodeSAMLUN(cmd.LUN)
+		scsiCmd.LUN = pdu.EncodeSAMLUN(cmd.LUN)
 
 		bhs, encErr := scsiCmd.MarshalBHS()
 		if encErr != nil {

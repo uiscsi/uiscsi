@@ -190,7 +190,7 @@ func Login(ctx context.Context, tc *transport.Conn, opts ...LoginOption) (*Negot
 	// leaving them leaks into ReadPump and causes spurious i/o timeouts
 	// after reconnect (the reconnect context has a 10s timeout whose
 	// deadline persists on the TCP connection).
-	ls.conn.SetDeadline(time.Time{})
+	_ = ls.conn.SetDeadline(time.Time{})
 
 	// Configure transport after successful login (Pitfall 6: only after login).
 	tc.SetDigests(ls.params.HeaderDigest, ls.params.DataDigest)
@@ -495,7 +495,7 @@ func (ls *loginState) sendLogin(ctx context.Context, keys []KeyValue, transit bo
 		raw.DataSegment = encoded[pdu.BHSLength:]
 	}
 
-	if err := transport.WriteRawPDU(ls.conn, raw); err != nil {
+	if err = transport.WriteRawPDU(ls.conn, raw); err != nil {
 		return nil, fmt.Errorf("login: write PDU: %w", err)
 	}
 

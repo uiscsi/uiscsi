@@ -34,7 +34,7 @@ func TestR2T_SinglePDU(t *testing.T) {
 	tgt.HandleLogout()
 	tgt.HandleNOPOut()
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		// Send a single R2T: TTT=0x100, offset=0, 512 bytes.
 		r2t := &pdu.R2T{
@@ -109,11 +109,11 @@ func TestR2T_SinglePDU(t *testing.T) {
 	if dout.DataSN != 0 {
 		t.Errorf("DataSN: got %d, want 0", dout.DataSN)
 	}
-	if !dout.Header.Final {
+	if !dout.Final {
 		t.Errorf("Final: got false, want true")
 	}
-	if dout.Header.DataSegmentLen != 512 {
-		t.Errorf("DataSegmentLen: got %d, want 512", dout.Header.DataSegmentLen)
+	if dout.DataSegmentLen != 512 {
+		t.Errorf("DataSegmentLen: got %d, want 512", dout.DataSegmentLen)
 	}
 }
 
@@ -140,7 +140,7 @@ func TestR2T_MultiPDU(t *testing.T) {
 	tgt.HandleLogout()
 	tgt.HandleNOPOut()
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		// Single R2T: TTT=0x200, offset=0, 1024 bytes.
 		r2t := &pdu.R2T{
@@ -215,11 +215,11 @@ func TestR2T_MultiPDU(t *testing.T) {
 			t.Errorf("PDU[%d] BufferOffset: got %d, want %d", i, dout.BufferOffset, wantOffset)
 		}
 		wantFinal := i == 3
-		if dout.Header.Final != wantFinal {
-			t.Errorf("PDU[%d] Final: got %v, want %v", i, dout.Header.Final, wantFinal)
+		if dout.Final != wantFinal {
+			t.Errorf("PDU[%d] Final: got %v, want %v", i, dout.Final, wantFinal)
 		}
-		if dout.Header.DataSegmentLen != 256 {
-			t.Errorf("PDU[%d] DataSegmentLen: got %d, want 256", i, dout.Header.DataSegmentLen)
+		if dout.DataSegmentLen != 256 {
+			t.Errorf("PDU[%d] DataSegmentLen: got %d, want 256", i, dout.DataSegmentLen)
 		}
 	}
 }
@@ -251,7 +251,7 @@ func TestR2T_MultipleR2T(t *testing.T) {
 	tgt.HandleLogout()
 	tgt.HandleNOPOut()
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		// R2T 0: TTT=0x300, BufferOffset=0, 512 bytes, R2TSN=0
 		r2t0 := &pdu.R2T{
@@ -362,7 +362,7 @@ func TestR2T_MultipleR2T(t *testing.T) {
 		t.Errorf("burst0x300 first BufferOffset: got %d, want 0", first0x300.BufferOffset)
 	}
 	last0x300 := burst0x300[len(burst0x300)-1].Decoded.(*pdu.DataOut)
-	if !last0x300.Header.Final {
+	if !last0x300.Final {
 		t.Errorf("burst0x300 last Final: got false, want true")
 	}
 
@@ -378,7 +378,7 @@ func TestR2T_MultipleR2T(t *testing.T) {
 		t.Errorf("burst0x301 first BufferOffset: got %d, want 512", first0x301.BufferOffset)
 	}
 	last0x301 := burst0x301[len(burst0x301)-1].Decoded.(*pdu.DataOut)
-	if !last0x301.Header.Final {
+	if !last0x301.Final {
 		t.Errorf("burst0x301 last Final: got false, want true")
 	}
 
@@ -413,7 +413,7 @@ func TestR2T_ParallelCommand(t *testing.T) {
 	tgt.HandleLogout()
 	tgt.HandleNOPOut()
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		var ttt uint32
 		if callCount == 0 {
@@ -506,10 +506,10 @@ func TestR2T_ParallelCommand(t *testing.T) {
 	ittToTTTs := make(map[uint32]map[uint32]bool)
 	for _, o := range outs {
 		dout := o.Decoded.(*pdu.DataOut)
-		if ittToTTTs[dout.Header.InitiatorTaskTag] == nil {
-			ittToTTTs[dout.Header.InitiatorTaskTag] = make(map[uint32]bool)
+		if ittToTTTs[dout.InitiatorTaskTag] == nil {
+			ittToTTTs[dout.InitiatorTaskTag] = make(map[uint32]bool)
 		}
-		ittToTTTs[dout.Header.InitiatorTaskTag][dout.TargetTransferTag] = true
+		ittToTTTs[dout.InitiatorTaskTag][dout.TargetTransferTag] = true
 	}
 
 	// Verify each command's Data-Out PDUs use a single, unique TTT.
@@ -531,11 +531,11 @@ func TestR2T_ParallelCommand(t *testing.T) {
 		dout := o.Decoded.(*pdu.DataOut)
 		if dout.DataSN != 0 {
 			t.Errorf("Data-Out ITT=0x%X TTT=0x%X DataSN: got %d, want 0",
-				dout.Header.InitiatorTaskTag, dout.TargetTransferTag, dout.DataSN)
+				dout.InitiatorTaskTag, dout.TargetTransferTag, dout.DataSN)
 		}
-		if !dout.Header.Final {
+		if !dout.Final {
 			t.Errorf("Data-Out ITT=0x%X TTT=0x%X Final: got false, want true",
-				dout.Header.InitiatorTaskTag, dout.TargetTransferTag)
+				dout.InitiatorTaskTag, dout.TargetTransferTag)
 		}
 	}
 }

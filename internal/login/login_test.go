@@ -175,7 +175,6 @@ func runMockTarget(t *testing.T, ln net.Listener, cfg mockTargetConfig) {
 				gotResp, err := decodeCHAPBinary(chapKeys["CHAP_R"])
 				if err != nil || len(gotResp) != 16 {
 					sendMockLoginResp(t, conn, req2, nil, statSN, 0, 2, 1, false, stageSecurityNegotiation, stageSecurityNegotiation)
-					statSN++
 					return
 				}
 
@@ -190,7 +189,6 @@ func runMockTarget(t *testing.T, ln net.Listener, cfg mockTargetConfig) {
 				if !match {
 					// Auth failure.
 					sendMockLoginResp(t, conn, req2, nil, statSN, 0, 2, 1, false, stageSecurityNegotiation, stageSecurityNegotiation)
-					statSN++
 					return
 				}
 
@@ -231,7 +229,6 @@ func runMockTarget(t *testing.T, ln net.Listener, cfg mockTargetConfig) {
 			// Build operational response keys.
 			respKeys := buildOperationalResponse(cfg)
 			sendMockLoginResp(t, conn, req, respKeys, statSN, cfg.tsih, 0, 0, true, stageOperationalNeg, stageFullFeaturePhase)
-			statSN++
 			return // login complete
 		}
 	}
@@ -283,7 +280,7 @@ func sendMockLoginResp(t *testing.T, conn net.Conn, req *pdu.LoginReq, keys []Ke
 	resp := &pdu.LoginResp{
 		Header: pdu.Header{
 			Final:            true,
-			InitiatorTaskTag: req.Header.InitiatorTaskTag,
+			InitiatorTaskTag: req.InitiatorTaskTag,
 			DataSegmentLen:   uint32(len(data)),
 		},
 		Transit:       transit,

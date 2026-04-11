@@ -39,7 +39,7 @@ func TestRetry_RejectCallerReissue(t *testing.T) {
 	tgt.HandleNOPOut()
 
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		if callCount == 0 {
 			// First command: send a Reject PDU with Reason=0x09 (Invalid PDU Field).
@@ -185,7 +185,7 @@ func TestRetry_SameConnectionRetry(t *testing.T) {
 	})
 
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		if callCount == 0 {
 			// First command: send a Reject PDU (Reason=0x09).
@@ -327,7 +327,7 @@ func TestRetry_ExpStatSNGap(t *testing.T) {
 	})
 
 	tgt.HandleSCSIFunc(func(tc *testutil.TargetConn, cmd *pdu.SCSICommand, callCount int) error {
-		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Header.Immediate)
+		expCmdSN, maxCmdSN := tgt.Session().Update(cmd.CmdSN, cmd.Immediate)
 
 		if callCount == 0 {
 			// First command: advance StatSN by 5 extra calls to create a gap.

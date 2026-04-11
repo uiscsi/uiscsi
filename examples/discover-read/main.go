@@ -16,9 +16,13 @@ import (
 )
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	if len(os.Args) < 2 {
 		fmt.Fprintf(os.Stderr, "usage: %s <target-address>\n", os.Args[0])
-		os.Exit(1)
+		return 1
 	}
 	addr := os.Args[1]
 	ctx := context.Background()
@@ -26,7 +30,8 @@ func main() {
 	// Step 1: Discover available targets.
 	targets, err := uiscsi.Discover(ctx, addr)
 	if err != nil {
-		log.Fatalf("discover: %v", err)
+		log.Printf("discover: %v", err)
+		return 1
 	}
 	fmt.Printf("Found %d target(s):\n", len(targets))
 	for _, t := range targets {
@@ -36,7 +41,7 @@ func main() {
 		}
 	}
 	if len(targets) == 0 {
-		return
+		return 0
 	}
 
 	// Step 2: Connect to first target.
@@ -44,23 +49,26 @@ func main() {
 		uiscsi.WithTarget(targets[0].Name),
 	)
 	if err != nil {
-		log.Fatalf("dial: %v", err)
+		log.Printf("dial: %v", err)
+		return 1
 	}
-	defer sess.Close()
+	defer func() { _ = sess.Close() }()
 
 	// Step 3: Query capacity.
-	cap, err := sess.ReadCapacity(ctx, 0)
+	cap, err := sess.SCSI().ReadCapacity(ctx, 0)
 	if err != nil {
-		log.Fatalf("read capacity: %v", err)
+		log.Printf("read capacity: %v", err)
+		return 1
 	}
 	fmt.Printf("LUN 0: %d blocks of %d bytes (%.2f GB)\n",
 		cap.LogicalBlocks, cap.BlockSize,
 		float64(cap.LogicalBlocks)*float64(cap.BlockSize)/1e9)
 
 	// Step 4: Read first block.
-	data, err := sess.ReadBlocks(ctx, 0, 0, 1, cap.BlockSize)
+	data, err := sess.SCSI().ReadBlocks(ctx, 0, 0, 1, cap.BlockSize)
 	if err != nil {
-		log.Fatalf("read: %v", err)
+		log.Printf("read: %v", err)
+		return 1
 	}
 	fmt.Printf("Read %d bytes from LBA 0\n", len(data))
 	// Print first 32 bytes in hex.
@@ -69,4 +77,5 @@ func main() {
 		n = len(data)
 	}
 	fmt.Printf("Data: %x\n", data[:n])
+	return 0
 }
