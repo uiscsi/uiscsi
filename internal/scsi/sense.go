@@ -12,7 +12,12 @@ type SenseData struct {
 	Key          SenseKey
 	ASC          uint8
 	ASCQ         uint8
-	Information  uint32
+	// Information holds the sense information value. For fixed-format sense
+	// (0x70/0x71) this is the 4-byte Information field (SPC-4 Table 28).
+	// For descriptor-format sense (0x72/0x73) this is the 8-byte Information
+	// field from the Information descriptor (SPC-4 4.5.2.1). Fixed-format
+	// values fit in the lower 32 bits.
+	Information uint64
 	Valid        bool
 	Filemark     bool
 	EOM          bool
@@ -54,7 +59,7 @@ func ParseSense(data []byte) (*SenseData, error) {
 		sd.EOM = data[2]&0x40 != 0
 		sd.ILI = data[2]&0x20 != 0
 		sd.Key = SenseKey(data[2] & 0x0F)
-		sd.Information = binary.BigEndian.Uint32(data[3:7])
+		sd.Information = uint64(binary.BigEndian.Uint32(data[3:7]))
 		sd.ASC = data[12]
 		sd.ASCQ = data[13]
 
@@ -65,12 +70,55 @@ func ParseSense(data []byte) (*SenseData, error) {
 		sd.Key = SenseKey(data[1] & 0x0F)
 		sd.ASC = data[2]
 		sd.ASCQ = data[3]
+		parseDescriptors(sd, data)
 
 	default:
 		return nil, fmt.Errorf("scsi: unknown sense response code 0x%02X", responseCode)
 	}
 
 	return sd, nil
+}
+
+// parseDescriptors iterates SPC-4 sense descriptors (Section 4.5.2) to extract
+// fields that fixed-format stores at fixed offsets but descriptor-format stores
+// in typed descriptor entries. Only the Information descriptor (type 0x00) and
+// Stream Commands descriptor (type 0x04) are handled; unknown types are skipped.
+func parseDescriptors(sd *SenseData, data []byte) {
+	if len(data) < 8 {
+		return
+	}
+	addlLen := int(data[7])
+	descStart := 8
+	descEnd := descStart + addlLen
+	if descEnd > len(data) {
+		descEnd = len(data)
+	}
+	pos := descStart
+	for pos+2 <= descEnd {
+		descType := data[pos]
+		descLen := int(data[pos+1])
+		descDataEnd := pos + 2 + descLen
+		if descDataEnd > descEnd {
+			break // truncated descriptor — stop safely
+		}
+		switch descType {
+		case 0x00: // Information descriptor (SPC-4 4.5.2.1)
+			// Layout: [type(1), len(1), valid|reserved(1), reserved(1), info(8)]
+			// descLen should be >= 10 (covers valid_bit byte, reserved, and 8-byte info).
+			if descLen >= 10 {
+				sd.Valid = data[pos+2]&0x80 != 0
+				sd.Information = binary.BigEndian.Uint64(data[pos+4 : pos+12])
+			}
+		case 0x04: // Stream commands descriptor (SPC-4 4.5.2.5)
+			// Layout: [type(1), len(1), reserved(1), flags(1)] — descLen=2 minimum
+			if descLen >= 2 {
+				sd.Filemark = data[pos+3]&0x80 != 0
+				sd.EOM = data[pos+3]&0x40 != 0
+				sd.ILI = data[pos+3]&0x20 != 0
+			}
+		}
+		pos = descDataEnd
+	}
 }
 
 // ascLookup returns a human-readable description for a given ASC/ASCQ pair.

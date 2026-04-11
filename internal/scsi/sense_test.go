@@ -15,7 +15,7 @@ func TestParseSense(t *testing.T) {
 		wantASC uint8
 		wantASCQ uint8
 		wantValid bool
-		wantInfo  uint32
+		wantInfo  uint64
 		wantErr bool
 	}{
 		{
@@ -448,6 +448,168 @@ func TestSenseKeyString(t *testing.T) {
 	if !strings.Contains(s, "0x0F") {
 		t.Errorf("unknown SenseKey.String() = %q, want to contain hex value", s)
 	}
+}
+
+func TestDescriptorSenseInformation(t *testing.T) {
+	// Information descriptor (type 0x00): descType=0x00, descLen=0x0A, valid_bit=0x80, reserved=0x00, 8-byte info
+	// Descriptor layout: [descType(1), descLen(1), valid|reserved(1), reserved(1), info(8)] = 12 bytes total
+	infoBytes := []byte{
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, // 8-byte info = 256
+	}
+	descriptors := []byte{
+		0x00, 0x0A, // type=0x00, len=10
+		0x80, 0x00, // valid=1, reserved
+	}
+	descriptors = append(descriptors, infoBytes...)
+
+	// Full descriptor-format sense buffer: header(8) + descriptors
+	data := []byte{
+		0x72,                   // byte 0: response code 0x72
+		0x05,                   // byte 1: sense key = ILLEGAL REQUEST
+		0x24,                   // byte 2: ASC
+		0x00,                   // byte 3: ASCQ
+		0x00, 0x00, 0x00,       // bytes 4-6: reserved
+		byte(len(descriptors)), // byte 7: additional sense length
+	}
+	data = append(data, descriptors...)
+
+	sd, err := ParseSense(data)
+	if err != nil {
+		t.Fatalf("ParseSense() unexpected error: %v", err)
+	}
+	if sd.Key != SenseIllegalRequest {
+		t.Errorf("Key = %v, want ILLEGAL REQUEST", sd.Key)
+	}
+	if !sd.Valid {
+		t.Errorf("Valid = false, want true (VALID bit set in Information descriptor)")
+	}
+	if sd.Information != 256 {
+		t.Errorf("Information = %d, want 256", sd.Information)
+	}
+}
+
+func TestDescriptorSenseStreamCommands(t *testing.T) {
+	// Stream commands descriptor (type 0x04): descType=0x04, descLen=0x02, reserved=0x00, flags_byte
+	// flags_byte bit 7=filemark, bit 6=EOM, bit 5=ILI
+	streamDesc := []byte{
+		0x04, 0x02, // type=0x04, len=2
+		0x00,       // reserved
+		0x80,       // filemark=1, EOM=0, ILI=0
+	}
+
+	data := []byte{
+		0x72,                   // response code
+		0x00,                   // sense key = NO SENSE
+		0x00, 0x01,             // ASC=0x00 ASCQ=0x01 (filemark detected)
+		0x00, 0x00, 0x00,       // reserved
+		byte(len(streamDesc)),  // additional sense length
+	}
+	data = append(data, streamDesc...)
+
+	sd, err := ParseSense(data)
+	if err != nil {
+		t.Fatalf("ParseSense() unexpected error: %v", err)
+	}
+	if !sd.Filemark {
+		t.Errorf("Filemark = false, want true")
+	}
+	if sd.EOM {
+		t.Errorf("EOM = true, want false")
+	}
+	if sd.ILI {
+		t.Errorf("ILI = true, want false")
+	}
+}
+
+func TestDescriptorSenseBothDescriptors(t *testing.T) {
+	// Both Information and Stream Commands descriptors
+	infoDesc := []byte{
+		0x00, 0x0A, // type=0x00, len=10
+		0x80, 0x00, // valid=1, reserved
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x42, // info = 0x42 = 66
+	}
+	streamDesc := []byte{
+		0x04, 0x02, // type=0x04, len=2
+		0x00,       // reserved
+		0xE0,       // filemark=1, EOM=1, ILI=1
+	}
+	descriptors := append(infoDesc, streamDesc...)
+
+	data := []byte{
+		0x72,
+		0x00,
+		0x00, 0x00,
+		0x00, 0x00, 0x00,
+		byte(len(descriptors)),
+	}
+	data = append(data, descriptors...)
+
+	sd, err := ParseSense(data)
+	if err != nil {
+		t.Fatalf("ParseSense() unexpected error: %v", err)
+	}
+	if sd.Information != 0x42 {
+		t.Errorf("Information = %d, want 66", sd.Information)
+	}
+	if !sd.Valid {
+		t.Errorf("Valid = false, want true")
+	}
+	if !sd.Filemark {
+		t.Errorf("Filemark = false, want true")
+	}
+	if !sd.EOM {
+		t.Errorf("EOM = false, want true")
+	}
+	if !sd.ILI {
+		t.Errorf("ILI = false, want true")
+	}
+}
+
+func TestDescriptorSenseNoDescriptors(t *testing.T) {
+	// Descriptor format with addlLen=0 (no descriptors): fields should be zero/false
+	data := []byte{
+		0x72,                // response code
+		0x05,                // sense key = ILLEGAL REQUEST
+		0x24, 0x00,          // ASC/ASCQ
+		0x00, 0x00, 0x00,    // reserved
+		0x00,                // additional sense length = 0
+	}
+
+	sd, err := ParseSense(data)
+	if err != nil {
+		t.Fatalf("ParseSense() unexpected error: %v", err)
+	}
+	if sd.Information != 0 {
+		t.Errorf("Information = %d, want 0", sd.Information)
+	}
+	if sd.Filemark {
+		t.Errorf("Filemark = true, want false")
+	}
+	if sd.Valid {
+		t.Errorf("Valid = true, want false")
+	}
+}
+
+func TestDescriptorSenseTruncatedDescriptor(t *testing.T) {
+	// Descriptor that claims length exceeds remaining data — must not panic
+	// Claim addlLen=20 but only provide 4 bytes of descriptors
+	data := []byte{
+		0x72,
+		0x00,
+		0x00, 0x00,
+		0x00, 0x00, 0x00,
+		20,   // additional sense length claims 20 bytes follow
+		0x04, // type=stream commands
+		0x02, // claims len=2, but we cut off here — only 2 bytes provided
+	}
+
+	sd, err := ParseSense(data)
+	// Should not panic. May or may not error depending on implementation.
+	if err != nil {
+		return // acceptable to return error for truncated
+	}
+	// If it succeeds, fields should be zero (truncated descriptor not applied)
+	_ = sd
 }
 
 func TestCommandErrorError(t *testing.T) {
