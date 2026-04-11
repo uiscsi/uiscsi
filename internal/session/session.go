@@ -163,21 +163,32 @@ func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error
 	tk.cmdSN = cmdSN   // Store for same-connection retry at ERL >= 1
 	tk.ctx = ctx       // Per-call context; taskLoop selects on ctx.Done() for timeout
 
+	// Transfer io.Reader ownership to task now — before the task is visible to
+	// the reconnect goroutine via s.tasks — so retryTasks() never sees a nil
+	// tk.reader for a write command (race: reconnect snapshots s.tasks after
+	// the task is registered but before Submit assigns tk.reader).
+	tk.reader = cmd.Data
+
+	// Snapshot session params and expStatSN under lock. reconnect() may replace
+	// s.params concurrently (race: Submit reads s.params.InitialR2T without lock
+	// while reconnect writes s.params under lock). Snapshot once, use throughout.
+	s.mu.Lock()
+	params := s.params
+	expStatSN := s.expStatSN
 	// Populate ERL fields for SNACK handling (DataSN gap detection, A-bit DataACK).
-	tk.erl = uint32(s.params.ErrorRecoveryLevel)
+	// Done here (under lock) to guarantee we see a consistent params snapshot.
+	tk.erl = uint32(params.ErrorRecoveryLevel)
+	s.tasks[itt] = tk
+	s.mu.Unlock()
+
 	tk.getWriteCh = s.getWriteCh
 	tk.expStatSNFunc = s.getExpStatSN
 	tk.snackTimeout = s.cfg.snackTimeout
 
-	s.mu.Lock()
-	s.tasks[itt] = tk
-	expStatSN := s.expStatSN
-	s.mu.Unlock()
-
 	// Read immediate data from io.Reader when ImmediateData=Yes.
 	var immediateData []byte
-	if isWrite && s.params.ImmediateData {
-		immLen := min(s.params.FirstBurstLength, s.params.MaxRecvDataSegmentLength)
+	if isWrite && params.ImmediateData {
+		immLen := min(params.FirstBurstLength, params.MaxRecvDataSegmentLength)
 		immBuf := make([]byte, immLen)
 		n, readErr := io.ReadFull(cmd.Data, immBuf)
 		if readErr != nil && readErr != io.ErrUnexpectedEOF {
@@ -216,14 +227,11 @@ func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error
 		return nil, ctx.Err()
 	}
 
-	// Transfer io.Reader ownership to task for R2T handling.
-	tk.reader = cmd.Data
-
 	// Send unsolicited Data-Out when InitialR2T=No (per D-04, WRITE-04).
 	// This runs synchronously in Submit so the io.Reader is not yet shared
 	// with the task goroutine (Pitfall 6: no concurrent reads).
-	if isWrite && !s.params.InitialR2T {
-		if err := tk.sendUnsolicitedDataOut(s.writeCh, s.getExpStatSN, s.params, s.stampDigests); err != nil {
+	if isWrite && !params.InitialR2T {
+		if err := tk.sendUnsolicitedDataOut(s.writeCh, s.getExpStatSN, params, s.stampDigests); err != nil {
 			s.router.Unregister(itt)
 			s.mu.Lock()
 			delete(s.tasks, itt)
@@ -287,19 +295,25 @@ func (s *Session) SubmitStreaming(ctx context.Context, cmd Command) (<-chan Resu
 	tk.cmdSN = cmdSN
 	tk.ctx = ctx // Per-call context; taskLoop selects on ctx.Done() for timeout
 
-	tk.erl = uint32(s.params.ErrorRecoveryLevel)
+	// Transfer io.Reader ownership to task before registering in s.tasks,
+	// for the same reason as in Submit (race with retryTasks reading tk.reader).
+	tk.reader = cmd.Data
+
+	// Snapshot params under lock (race: s.params may be replaced by reconnect).
+	s.mu.Lock()
+	params := s.params
+	expStatSN := s.expStatSN
+	tk.erl = uint32(params.ErrorRecoveryLevel)
+	s.tasks[itt] = tk
+	s.mu.Unlock()
+
 	tk.getWriteCh = s.getWriteCh
 	tk.expStatSNFunc = s.getExpStatSN
 	tk.snackTimeout = s.cfg.snackTimeout
 
-	s.mu.Lock()
-	s.tasks[itt] = tk
-	expStatSN := s.expStatSN
-	s.mu.Unlock()
-
 	var immediateData []byte
-	if isWrite && s.params.ImmediateData {
-		immLen := min(s.params.FirstBurstLength, s.params.MaxRecvDataSegmentLength)
+	if isWrite && params.ImmediateData {
+		immLen := min(params.FirstBurstLength, params.MaxRecvDataSegmentLength)
 		immBuf := make([]byte, immLen)
 		n, readErr := io.ReadFull(cmd.Data, immBuf)
 		if readErr != nil && readErr != io.ErrUnexpectedEOF {
@@ -333,10 +347,8 @@ func (s *Session) SubmitStreaming(ctx context.Context, cmd Command) (<-chan Resu
 		return nil, nil, ctx.Err()
 	}
 
-	tk.reader = cmd.Data
-
-	if isWrite && !s.params.InitialR2T {
-		if err := tk.sendUnsolicitedDataOut(s.writeCh, s.getExpStatSN, s.params, s.stampDigests); err != nil {
+	if isWrite && !params.InitialR2T {
+		if err := tk.sendUnsolicitedDataOut(s.writeCh, s.getExpStatSN, params, s.stampDigests); err != nil {
 			s.router.Unregister(itt)
 			s.mu.Lock()
 			delete(s.tasks, itt)
