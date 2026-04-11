@@ -527,14 +527,17 @@ func (s *Session) startPumps(ctx context.Context) {
 	wg := &sync.WaitGroup{}
 	wg.Add(4)
 
+	// Store pumpWg before launching goroutines so that a concurrent Close()
+	// call cannot snapshot s.pumpWg as nil and skip wg.Wait(), which would
+	// allow session teardown to race with the pump goroutines accessing s.conn.
+	s.mu.Lock()
+	s.pumpWg = wg
+	s.mu.Unlock()
+
 	go func() { defer wg.Done(); s.readPumpLoop(ctx, conn, unsolCh) }()
 	go func() { defer wg.Done(); s.writePumpLoop(ctx, conn, writeCh) }()
 	go func() { defer wg.Done(); s.dispatchLoop(ctx, unsolCh, done) }()
 	go func() { defer wg.Done(); s.keepaliveLoop(ctx) }()
-
-	s.mu.Lock()
-	s.pumpWg = wg
-	s.mu.Unlock()
 }
 
 // pduHookBridge returns a transport-compatible PDU hook function that bridges
