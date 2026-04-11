@@ -811,6 +811,12 @@ func (s *Session) taskLoop(tk *task, pduCh <-chan *transport.RawPDU) {
 
 // cleanupTask removes a completed task from tracking.
 func (s *Session) cleanupTask(itt uint32) {
+	// Unregister (not UnregisterAndClose) is intentional: taskLoop exits via
+	// tk.done, not via channel close. Closing the channel here would risk a
+	// send-on-closed-channel panic if a late Dispatch call races with the close.
+	// Any PDU arriving after Unregister removes the map entry is silently
+	// discarded by the dispatcher — the bounded channel (persistentDepth)
+	// prevents blocking.
 	s.router.Unregister(itt)
 	s.mu.Lock()
 	delete(s.tasks, itt)
