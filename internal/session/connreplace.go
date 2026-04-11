@@ -35,13 +35,20 @@ func (s *Session) replaceConnection(cause error) error {
 	}
 
 	// Step 2: Snapshot in-flight tasks (keep them alive, unlike ERL 0 which
-	// clears and retries -- ERL 2 reassigns).
+	// clears and retries -- ERL 2 reassigns). Close the old pduCh channels
+	// so taskLoop goroutines waiting on them exit cleanly. It is safe to close
+	// because oldWg.Wait() above guarantees the read pump goroutine has exited.
 	s.mu.Lock()
 	taskSnapshot := make(map[uint32]*task, len(s.tasks))
 	for itt, tk := range s.tasks {
 		taskSnapshot[itt] = tk
 	}
 	s.mu.Unlock()
+
+	// Close old channels to unblock old taskLoop goroutines.
+	for itt := range taskSnapshot {
+		s.router.UnregisterAndClose(itt)
+	}
 
 	// Step 3: Dial new TCP connection.
 	ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Second)

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/uiscsi/uiscsi/internal/pdu"
@@ -21,6 +22,8 @@ type task struct {
 	cmdSN      uint32        // stored for same-connection retry at ERL >= 1 (RFC 7143 Section 6.2.1)
 	buf        *bytes.Buffer // accumulates Data-In payload for read commands
 	resultCh   chan Result
+	done       chan struct{} // closed by cancel() to unblock taskLoop goroutine on session Close
+	cancelOnce sync.Once    // ensures done is closed exactly once
 	nextDataSN uint32
 	nextOffset uint32
 	isRead     bool
@@ -47,6 +50,7 @@ func newTask(itt uint32, isRead bool, isWrite bool, streamBufDepth int) *task {
 	t := &task{
 		itt:       itt,
 		resultCh:  make(chan Result, 1),
+		done:      make(chan struct{}),
 		isRead:    isRead,
 		isWrite:   isWrite,
 		startTime: time.Now(),
@@ -212,7 +216,8 @@ func (t *task) handleSCSIResponse(resp *pdu.SCSIResponse) {
 
 // cancel aborts this task with an error. For streaming tasks, the
 // chanReader is closed with the error so that the caller's Read
-// returns it immediately.
+// returns it immediately. The done channel is closed to unblock any
+// taskLoop goroutine waiting on pduCh, ensuring no goroutine leaks.
 func (t *task) cancel(err error) {
 	if t.streaming && t.dataReader != nil {
 		t.dataReader.closeWithError(err)
@@ -221,4 +226,5 @@ func (t *task) cancel(err error) {
 	case t.resultCh <- Result{Err: err}:
 	default:
 	}
+	t.cancelOnce.Do(func() { close(t.done) })
 }

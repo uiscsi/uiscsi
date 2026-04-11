@@ -17,6 +17,13 @@ import (
 // negotiated ErrorRecoveryLevel. It is safe to call from multiple goroutines;
 // only the first call starts recovery, subsequent calls are no-ops.
 func (s *Session) triggerReconnect(cause error) {
+	// Do not reconnect if the session is being closed.
+	select {
+	case <-s.closed:
+		return
+	default:
+	}
+
 	s.mu.Lock()
 	if s.recovering {
 		s.mu.Unlock()
@@ -46,6 +53,16 @@ func (s *Session) triggerReconnect(cause error) {
 // exponential backoff, re-logins with same ISID+TSIH, replaces session
 // internals, and retries snapshotted tasks.
 func (s *Session) reconnect(cause error) {
+	// Check if session was closed before reconnect even started.
+	select {
+	case <-s.closed:
+		s.mu.Lock()
+		s.recovering = false
+		s.mu.Unlock()
+		return
+	default:
+	}
+
 	s.cfg.logger.Info("session: connection lost, starting ERL 0 recovery", "cause", cause)
 
 	// Step 1: Stop old pumps by cancelling context and closing old connection.
@@ -65,6 +82,16 @@ func (s *Session) reconnect(cause error) {
 		oldWg.Wait()
 	}
 
+	// Check if Close() was called while we were stopping old pumps.
+	select {
+	case <-s.closed:
+		s.mu.Lock()
+		s.recovering = false
+		s.mu.Unlock()
+		return
+	default:
+	}
+
 	// Step 2: Snapshot in-flight tasks and clear session state.
 	s.mu.Lock()
 	taskSnapshot := make(map[uint32]*task, len(s.tasks))
@@ -74,9 +101,12 @@ func (s *Session) reconnect(cause error) {
 	s.tasks = make(map[uint32]*task)
 	s.mu.Unlock()
 
-	// Unregister all old ITTs from router.
+	// Unregister and close all old ITT channels. It is safe to close the
+	// channels here because oldWg.Wait() above guarantees the read pump
+	// goroutine has exited — no more Dispatch calls can occur for these ITTs.
+	// Closing the channels unblocks any taskLoop goroutines waiting on pduCh.
 	for itt := range taskSnapshot {
-		s.router.Unregister(itt)
+		s.router.UnregisterAndClose(itt)
 	}
 
 	// Step 3: Exponential backoff reconnect loop.
@@ -87,7 +117,28 @@ func (s *Session) reconnect(cause error) {
 	for attempt := range s.cfg.maxReconnectAttempts {
 		if attempt > 0 {
 			delay := s.cfg.reconnectBackoff * time.Duration(1<<uint(max(0, attempt-1)))
-			time.Sleep(delay)
+			// Use a timer-based select so the reconnect goroutine can be
+			// interrupted by Close() without blocking for the full backoff period.
+			timer := time.NewTimer(delay)
+			select {
+			case <-timer.C:
+			case <-s.closed:
+				timer.Stop()
+				s.mu.Lock()
+				s.recovering = false
+				s.mu.Unlock()
+				return // session closed, abort reconnect
+			}
+		}
+
+		// Check again after sleep in case Close() was called.
+		select {
+		case <-s.closed:
+			s.mu.Lock()
+			s.recovering = false
+			s.mu.Unlock()
+			return
+		default:
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

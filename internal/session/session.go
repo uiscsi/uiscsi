@@ -49,6 +49,7 @@ type Session struct {
 	done      chan struct{}
 	pumpWg    *sync.WaitGroup // tracks all 4 pump goroutines for deterministic Close
 	closeOnce sync.Once
+	closed    chan struct{} // closed by Close() to signal reconnect goroutine to abort
 	err       error
 
 	cfg sessionConfig
@@ -84,6 +85,7 @@ func NewSession(conn *transport.Conn, params login.NegotiatedParams, opts ...Ses
 		loggedIn:   true,
 		cancel:     cancel,
 		done:       make(chan struct{}),
+		closed:     make(chan struct{}),
 		cfg:        cfg,
 		targetAddr: cfg.targetAddr,
 		loginOpts:  cfg.loginOpts,
@@ -399,6 +401,12 @@ func (s *Session) Close() error {
 		s.cfg.logger.Info("session: closing",
 			"was_logged_in", wasLoggedIn)
 
+		// Signal reconnect goroutine to abort before attempting logout.
+		// This prevents a reconnect from starting if the logout causes the
+		// remote side to close the TCP connection while the read pump is
+		// still running (which would otherwise look like a connection error).
+		close(s.closed)
+
 		if wasLoggedIn && !hasErr {
 			const logoutTimeout = 5 * time.Second // enough for a single PDU round-trip
 			ctx, cancel := context.WithTimeout(context.Background(), logoutTimeout)
@@ -687,8 +695,21 @@ func (s *Session) handleUnsolicited(raw *transport.RawPDU) {
 
 // taskLoop drains PDUs from the router channel for a single task.
 // It runs in its own goroutine so one slow reader doesn't block others.
+// The select on tk.done ensures this goroutine exits when the task is
+// cancelled (e.g. during session Close) even if no more PDUs arrive on
+// pduCh, preventing goroutine leaks.
 func (s *Session) taskLoop(tk *task, pduCh <-chan *transport.RawPDU) {
-	for raw := range pduCh {
+	for {
+		var raw *transport.RawPDU
+		select {
+		case <-tk.done:
+			return
+		case r, ok := <-pduCh:
+			if !ok {
+				return
+			}
+			raw = r
+		}
 		decoded, err := pdu.DecodeBHS(raw.BHS)
 		if err != nil {
 			tk.cancel(fmt.Errorf("session: decode response PDU (itt=0x%08x): %w", tk.itt, err))

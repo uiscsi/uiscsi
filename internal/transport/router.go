@@ -10,7 +10,7 @@ const reservedITT uint32 = 0xFFFFFFFF
 // routerEntry holds a pending registration in the Router. Persistent entries
 // survive Dispatch calls (used by session layer for multi-PDU commands).
 type routerEntry struct {
-	ch         chan<- *RawPDU
+	ch         chan *RawPDU // bidirectional; written by Dispatch, read by session taskLoop
 	persistent bool
 }
 
@@ -118,6 +118,22 @@ func (r *Router) Unregister(itt uint32) {
 	r.mu.Lock()
 	delete(r.pending, itt)
 	r.mu.Unlock()
+}
+
+// UnregisterAndClose removes a pending ITT entry and closes its channel.
+// This is safe to call only after all callers of Dispatch have stopped
+// (e.g. after the read pump goroutine has exited). Closing the channel
+// unblocks any goroutine blocked in a range or select on the channel.
+// For non-persistent entries the channel is NOT closed (they have capacity 1
+// and the waiter drains them via receive, not range).
+func (r *Router) UnregisterAndClose(itt uint32) {
+	r.mu.Lock()
+	entry, ok := r.pending[itt]
+	delete(r.pending, itt)
+	r.mu.Unlock()
+	if ok && entry.persistent {
+		close(entry.ch)
+	}
 }
 
 // PendingCount returns the number of ITTs currently awaiting responses.
