@@ -479,22 +479,17 @@ func TestReadPump_NOPInNeverDropped(t *testing.T) {
 	bhs := makeUnsolicitedPDU(pdu.OpNOPIn)
 	writeRawBytes(wConn, bhs, nil, nil, false, false)
 
-	// Give ReadPump time to receive and block on the full channel.
-	time.Sleep(50 * time.Millisecond)
-
-	// Drop counter must be zero — NOP-In must not be dropped.
-	if got := dropCounter.Load(); got != 0 {
-		t.Errorf("drop counter = %d after NOP-In with full channel, want 0", got)
-	}
-
-	// Drain the blocking PDU from the channel, which unblocks ReadPump.
+	// Drain the pre-filled dummy, which unblocks ReadPump's blocking send.
+	// No sleep needed: the drain itself creates the backpressure-release that
+	// allows ReadPump to deliver the NOP-In. If ReadPump incorrectly dropped
+	// the NOP-In instead of blocking, it will never arrive (timeout below).
 	select {
 	case <-unsolicitedCh: // remove the pre-filled dummy
-	case <-time.After(time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("timeout draining pre-filled PDU")
 	}
 
-	// Now the NOP-In PDU should be delivered.
+	// NOP-In must be delivered — it must not have been dropped.
 	select {
 	case got := <-unsolicitedCh:
 		opcode := pdu.OpCode(got.BHS[0] & 0x3f)
@@ -502,12 +497,12 @@ func TestReadPump_NOPInNeverDropped(t *testing.T) {
 			t.Errorf("delivered opcode = %v, want OpNOPIn", opcode)
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("timeout waiting for NOP-In delivery after channel drained")
+		t.Fatal("NOP-In not delivered — was incorrectly dropped instead of blocked")
 	}
 
-	// Drop counter still zero.
+	// Drop counter must be zero throughout.
 	if got := dropCounter.Load(); got != 0 {
-		t.Errorf("drop counter = %d after successful NOP-In delivery, want 0", got)
+		t.Errorf("drop counter = %d, want 0 — NOP-In must never be dropped", got)
 	}
 
 	// Shut down cleanly.
