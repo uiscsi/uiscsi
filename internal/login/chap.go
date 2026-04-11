@@ -136,9 +136,9 @@ func (cs *chapState) processChallenge(keys map[string]string) (map[string]string
 	if !ok {
 		return nil, fmt.Errorf("chap: missing CHAP_I key")
 	}
-	idVal, err := strconv.Atoi(idStr)
+	idVal, err := strconv.ParseUint(idStr, 10, 8)
 	if err != nil {
-		return nil, fmt.Errorf("chap: invalid CHAP_I value %q: %w", idStr, err)
+		return nil, fmt.Errorf("chap: invalid CHAP_I value %q (expected 0-255): %w", idStr, err)
 	}
 	id := byte(idVal)
 
