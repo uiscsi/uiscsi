@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// RFC-03: All 18 opcodes verified with field-level round-trip assertions.
 // TestPDURoundTrip tests MarshalBHS -> DecodeBHS round-trip for all 18 opcode types.
 func TestPDURoundTrip(t *testing.T) {
 	tests := []struct {
