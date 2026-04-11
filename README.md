@@ -2,7 +2,7 @@
 
 A pure-userspace iSCSI initiator library for Go.
 
-**Status:** v1.3.0 -- full RFC 7143 compliance with 87 wire-level conformance tests and 21 E2E tests against real LIO kernel targets. Grouped Session API. Bounded-memory streaming I/O. Configurable performance tuning.
+**Status:** v1.3.1 -- full RFC 7143 compliance with 87 wire-level conformance tests and 21 E2E tests against real LIO kernel targets. Grouped Session API. Bounded-memory streaming I/O. Deterministic session shutdown. Configurable performance tuning.
 
 ## Overview
 
@@ -30,7 +30,8 @@ It supports CHAP and mutual CHAP authentication, header and data digest negotiat
 - **Mode pages** -- ModeSense6/10 and ModeSelect6/10 for device configuration
 - **Error recovery** -- ERL 0 (session reconnect), ERL 1 (SNACK), ERL 2 (connection replace)
 - **Task management** -- ABORT TASK, LUN RESET, TARGET WARM/COLD RESET via `sess.TMF()`
-- **Observability** -- slog structured logging, PDU hooks, metrics callbacks
+- **Deterministic shutdown** -- `Close()` waits for all pump goroutines via WaitGroup; no leaked goroutines after session teardown
+- **Observability** -- slog structured logging, PDU hooks, async PDU drop counter, metrics callbacks
 - **Digests** -- CRC32C header and data digest negotiation and verification
 - **Discovery** -- SendTargets enumeration, multi-portal support
 - **CLI tool** -- `uiscsi-ls` for lsscsi-style target discovery from the command line
@@ -155,6 +156,8 @@ The library includes three test tiers:
 - **Unit tests** -- table-driven tests for PDU codec, serial arithmetic, sense parsing (`go test ./...`)
 - **Conformance tests** -- 87 wire-level tests against an in-process mock iSCSI target with PDU capture (`test/conformance/`). Covers 84% of the UNH-IOL Initiator Full Feature Phase test suite (see `doc/test_matrix_initiator_ffp.md`).
 - **E2E tests** -- 21 tests against a real Linux LIO kernel target via configfs (`sudo go test -tags e2e ./test/e2e/`)
+
+All test suites run with `-race` and [goleak](https://github.com/uber-go/goleak) to catch goroutine leaks.
 
 ## Requirements
 
