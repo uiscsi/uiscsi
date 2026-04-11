@@ -368,12 +368,28 @@ func (s *Session) Close() error {
 		close(s.closed)
 
 		if wasLoggedIn && !hasErr {
-			const logoutTimeout = 5 * time.Second // enough for a single PDU round-trip
-			ctx, cancel := context.WithTimeout(context.Background(), logoutTimeout)
-			if err := s.logout(ctx, 0); err != nil {
-				s.cfg.logger.Warn("session: logout failed during close", "err", err)
+			// Only attempt graceful logout when the connection is healthy:
+			// - no in-flight commands (their CmdSN slots won't be freed while they
+			//   are pending, so logout's window.acquire would block for the full timeout)
+			// - not currently recovering (the old connection is dead; logout would
+			//   time out waiting for a response that can never arrive)
+			s.mu.Lock()
+			pendingTasks := len(s.tasks)
+			isRecovering := s.recovering
+			s.mu.Unlock()
+
+			if pendingTasks == 0 && !isRecovering {
+				const logoutTimeout = 5 * time.Second // enough for a single PDU round-trip
+				ctx, cancel := context.WithTimeout(context.Background(), logoutTimeout)
+				if err := s.logout(ctx, 0); err != nil {
+					s.cfg.logger.Warn("session: logout failed during close", "err", err)
+				}
+				cancel()
+			} else {
+				s.cfg.logger.Info("session: skipping graceful logout",
+					"pending_tasks", pendingTasks,
+					"recovering", isRecovering)
 			}
-			cancel()
 		}
 
 		// Snapshot window under lock — reconnect() may replace s.window

@@ -939,3 +939,90 @@ func TestSubmitContextCancel(t *testing.T) {
 		t.Fatalf("second Submit result error: %v", result2.Err)
 	}
 }
+
+// TestCloseDetachesAllPumps verifies SESS-07: Close() returns only after all
+// pump goroutines have exited. goleak in TestMain enforces the no-leak invariant.
+func TestCloseDetachesAllPumps(t *testing.T) {
+	clientConn, targetConn := net.Pipe()
+
+	tc := transport.NewConnFromNetConn(clientConn)
+	params := login.Defaults()
+	params.CmdSN = 1
+	params.ExpStatSN = 1
+	sess := NewSession(tc, params)
+
+	// Optionally submit a command to ensure pump goroutines are actively
+	// handling work before we Close.
+	cmd := Command{Read: true, ExpectedDataTransferLen: 4}
+	cmd.CDB[0] = 0x28
+	resultCh, err := sess.Submit(context.Background(), cmd)
+	if err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+
+	// Close must return within 5 seconds — it must not hang waiting for pumps.
+	closeDone := make(chan struct{})
+	go func() {
+		defer close(closeDone)
+		go respondToLogout(targetConn)
+		sess.Close()
+	}()
+
+	select {
+	case <-closeDone:
+		// Close returned — success.
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close() did not return within 5 seconds — possible goroutine leak or deadlock")
+	}
+
+	// Drain the result channel so goleak does not see a goroutine blocked on
+	// the channel send. The result will be an error since the session was closed.
+	select {
+	case <-resultCh:
+	default:
+	}
+
+	targetConn.Close()
+}
+
+// TestCloseDuringReconnect verifies SESS-07: Close() during an active ERL 0
+// reconnect attempt returns promptly without hanging. goleak in TestMain
+// enforces the no-leak invariant.
+func TestCloseDuringReconnect(t *testing.T) {
+	// Use a target address that will refuse connections (port 0 is not a valid
+	// listen port — we just need reconnect to fail fast or be aborted by Close).
+	clientConn, targetConn := net.Pipe()
+
+	tc := transport.NewConnFromNetConn(clientConn)
+	params := login.Defaults()
+	params.CmdSN = 1
+	params.ExpStatSN = 1
+
+	sess := NewSession(tc, params,
+		WithReconnectInfo("127.0.0.1:1"), // port 1: connection refused immediately
+		WithMaxReconnectAttempts(5),
+		WithReconnectBackoff(50*time.Millisecond),
+	)
+
+	// Close the server side of the pipe to trigger a connection error in the
+	// read pump, which will call triggerReconnect → reconnect().
+	targetConn.Close()
+
+	// Wait briefly to let the read pump detect the error and set s.recovering=true.
+	// This window is deliberately short — we just need the goroutine to start.
+	time.Sleep(30 * time.Millisecond)
+
+	// Close() must return even while reconnect is in progress.
+	closeDone := make(chan struct{})
+	go func() {
+		defer close(closeDone)
+		sess.Close()
+	}()
+
+	select {
+	case <-closeDone:
+		// Close returned — success.
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close() during reconnect did not return within 5 seconds — possible goroutine leak or deadlock")
+	}
+}
