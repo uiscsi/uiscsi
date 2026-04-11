@@ -2,7 +2,7 @@
 
 A pure-userspace iSCSI initiator library for Go.
 
-**Status:** v1.3.1 -- full RFC 7143 compliance with 87 wire-level conformance tests and 21 E2E tests against real LIO kernel targets. Grouped Session API. Bounded-memory streaming I/O. Deterministic session shutdown. Configurable performance tuning.
+**Status:** Full RFC 7143 compliance with 87 wire-level conformance tests and 21 E2E tests against real LIO kernel targets. Grouped Session API. Bounded-memory streaming I/O. Deterministic session shutdown. Configurable performance tuning. Observability hooks for metrics, state changes, and wire-level inspection.
 
 ## Overview
 
@@ -31,7 +31,9 @@ It supports CHAP and mutual CHAP authentication, header and data digest negotiat
 - **Error recovery** -- ERL 0 (session reconnect), ERL 1 (SNACK), ERL 2 (connection replace)
 - **Task management** -- ABORT TASK, LUN RESET, TARGET WARM/COLD RESET via `sess.TMF()`
 - **Deterministic shutdown** -- `Close()` waits for all pump goroutines via WaitGroup; no leaked goroutines after session teardown
-- **Observability** -- slog structured logging, PDU hooks, async PDU drop counter, metrics callbacks
+- **Observability** -- `WithMetricsHook` (per-command latency/bytes), `WithStateChangeHook` (session lifecycle), `WithPDUHook` (wire-level inspection), `WithLogger` for slog integration
+- **Security hazard notices** -- godoc warns on dangerous entry points (raw CDB pass-through, FORMAT UNIT access)
+- **Complete godoc** -- full coverage with runnable examples
 - **Digests** -- CRC32C header and data digest negotiation and verification
 - **Discovery** -- SendTargets enumeration, multi-portal support
 - **CLI tool** -- `uiscsi-ls` for lsscsi-style target discovery from the command line
@@ -115,6 +117,8 @@ Full documentation is available on [pkg.go.dev](https://pkg.go.dev/github.com/ui
 | `WithDataIn` | Configure read response allocation |
 | `WithDataOut` | Configure write data |
 
+> **Security notice:** `Execute` and `StreamExecute` accept arbitrary CDB bytes. Callers can issue any SCSI command to the target, including destructive operations (FORMAT UNIT, WRITE SAME with unmap, persistent reservation preempt-and-abort). This is intentional for a low-level library. Applications must ensure only authorized users can invoke these methods.
+
 ### Helpers
 
 | Function | Description |
@@ -124,7 +128,7 @@ Full documentation is available on [pkg.go.dev](https://pkg.go.dev/github.com/ui
 | `DecodeLUN` | Decode SAM LUN encoding |
 | `DeviceTypeName` | Human-readable device type |
 
-### Performance Tuning
+## Performance Tuning
 
 For high-throughput workloads (tape drives, large sequential I/O):
 
@@ -140,6 +144,69 @@ sess, err := uiscsi.Dial(ctx, addr,
 ```
 
 **StreamBufDepth** and **RouterBufDepth** control internal PDU buffering. These are critical for tape drives: shallow buffers cause TCP backpressure during GC pauses, stopping the tape drive (shoe-shining). The defaults (128 + 64) provide ~1.5MB of buffering at 8KB MRDSL — enough to absorb 50+ ms of consumer stalls.
+
+## Observability
+
+Three hook types allow callers to instrument sessions without modifying library internals.
+
+### Metrics Hook
+
+`WithMetricsHook` receives a `CommandMetrics` struct after each SCSI command completes:
+
+```go
+sess, err := uiscsi.Dial(ctx, addr,
+    uiscsi.WithTarget(iqn),
+    uiscsi.WithMetricsHook(func(m uiscsi.CommandMetrics) {
+        log.Printf("opcode=0x%02x latency=%s bytesIn=%d bytesOut=%d err=%v",
+            m.Opcode, m.Latency, m.BytesIn, m.BytesOut, m.Err)
+    }),
+)
+```
+
+`CommandMetrics` fields: `Opcode` (SCSI command code), `Latency` (round-trip duration), `BytesIn` (data received from target), `BytesOut` (data sent to target), `Err` (nil on success).
+
+### State Change Hook
+
+`WithStateChangeHook` receives callbacks when the session transitions between states:
+
+```go
+sess, err := uiscsi.Dial(ctx, addr,
+    uiscsi.WithTarget(iqn),
+    uiscsi.WithStateChangeHook(func(old, new uiscsi.SessionState) {
+        log.Printf("session state: %s -> %s", old, new)
+    }),
+)
+```
+
+States: `StateLogin`, `StateFullFeature`, `StateRecovery`, `StateClosed`.
+
+### PDU Hook
+
+`WithPDUHook` exposes raw PDU bytes for wire-level inspection and debugging:
+
+```go
+sess, err := uiscsi.Dial(ctx, addr,
+    uiscsi.WithTarget(iqn),
+    uiscsi.WithPDUHook(func(direction uiscsi.PDUDirection, pdu []byte) {
+        // direction is PDUDirectionSend or PDUDirectionRecv
+        log.Printf("%s PDU opcode=0x%02x len=%d", direction, pdu[0]&0x3f, len(pdu))
+    }),
+)
+```
+
+The hook is called synchronously in the read/write pump goroutine. Keep it fast to avoid backpressure.
+
+### Logger
+
+`WithLogger` injects a `slog.Logger` for session diagnostics. The library emits structured debug-level events for login negotiation, connection lifecycle, and error recovery:
+
+```go
+logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
+sess, err := uiscsi.Dial(ctx, addr,
+    uiscsi.WithTarget(iqn),
+    uiscsi.WithLogger(logger),
+)
+```
 
 ### Error Types
 
