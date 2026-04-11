@@ -155,6 +155,7 @@ func (s *Session) Submit(ctx context.Context, cmd Command) (<-chan Result, error
 	tk.lun = cmd.LUN  // Store LUN for TMF LUN-based cleanup
 	tk.cmd = cmd       // Store for retry during ERL 0 recovery
 	tk.cmdSN = cmdSN   // Store for same-connection retry at ERL >= 1
+	tk.ctx = ctx       // Per-call context; taskLoop selects on ctx.Done() for timeout
 
 	// Populate ERL fields for SNACK handling (DataSN gap detection, A-bit DataACK).
 	tk.erl = uint32(s.params.ErrorRecoveryLevel)
@@ -274,6 +275,7 @@ func (s *Session) SubmitStreaming(ctx context.Context, cmd Command) (<-chan Resu
 	tk.lun = cmd.LUN
 	tk.cmd = cmd
 	tk.cmdSN = cmdSN
+	tk.ctx = ctx // Per-call context; taskLoop selects on ctx.Done() for timeout
 
 	tk.erl = uint32(s.params.ErrorRecoveryLevel)
 	tk.getWriteCh = s.getWriteCh
@@ -660,11 +662,32 @@ func (s *Session) handleUnsolicited(raw *transport.RawPDU) {
 // The select on tk.done ensures this goroutine exits when the task is
 // cancelled (e.g. during session Close) even if no more PDUs arrive on
 // pduCh, preventing goroutine leaks.
+//
+// The select on tk.ctx.Done() handles per-call context timeout/cancel
+// that occurs after the PDU has been sent to the write pump. Without this
+// arm, a context deadline exceeded after submission would leave the task
+// goroutine blocked forever (goroutine leak) and the ITT stuck in s.tasks
+// (ITT leak). (SESS-04)
 func (s *Session) taskLoop(tk *task, pduCh <-chan *transport.RawPDU) {
+	// If tk.ctx is nil (e.g. tasks injected directly in tests or reassigned
+	// via ERL 2), ctxDone is nil which blocks forever — equivalent to no
+	// per-call timeout. Normal tasks submitted via Submit/SubmitStreaming
+	// always have a non-nil ctx.
+	var ctxDone <-chan struct{}
+	if tk.ctx != nil {
+		ctxDone = tk.ctx.Done()
+	}
+
 	for {
 		var raw *transport.RawPDU
 		select {
 		case <-tk.done:
+			return
+		case <-ctxDone:
+			// Per-call context expired after PDU was sent. Cancel task
+			// and clean up ITT so the session can accept new commands.
+			tk.cancel(tk.ctx.Err())
+			s.cleanupTask(tk.itt)
 			return
 		case r, ok := <-pduCh:
 			if !ok {
@@ -713,7 +736,7 @@ func (s *Session) taskLoop(tk *task, pduCh <-chan *transport.RawPDU) {
 					"max_cmd_sn", p.MaxCmdSN)
 			}
 			s.updateStatSN(p.StatSN)
-			if err := tk.handleR2T(p, s.writeCh, s.getExpStatSN, s.params, s.stampDigests); err != nil {
+			if err := tk.handleR2T(p, s.getWriteCh(), s.getExpStatSN, s.params, s.stampDigests); err != nil {
 				tk.cancel(fmt.Errorf("session: write data (itt=0x%08x): %w", tk.itt, err))
 				s.cleanupTask(tk.itt)
 				return
@@ -824,6 +847,7 @@ func (s *Session) retrySameConnection(tk *task) {
 	// Streaming tasks cannot be retried — caller holds the chanReader.
 	if tk.streaming {
 		tk.cancel(fmt.Errorf("session: streaming task not retriable"))
+		s.cleanupTask(tk.itt)
 		return
 	}
 
@@ -842,11 +866,13 @@ func (s *Session) retrySameConnection(tk *task) {
 		if seeker, ok := tk.reader.(io.Seeker); ok {
 			if _, err := seeker.Seek(0, io.SeekStart); err != nil {
 				tk.cancel(fmt.Errorf("session: same-connection retry seek failed: %w", err))
+				s.cleanupTask(tk.itt)
 				return
 			}
 			tk.bytesSent = 0
 		} else {
 			tk.cancel(ErrRetryNotPossible)
+			s.cleanupTask(tk.itt)
 			return
 		}
 		immLen := min(s.params.FirstBurstLength, s.params.MaxRecvDataSegmentLength)
@@ -854,6 +880,7 @@ func (s *Session) retrySameConnection(tk *task) {
 		n, readErr := io.ReadFull(tk.reader, immBuf)
 		if readErr != nil && readErr != io.ErrUnexpectedEOF {
 			tk.cancel(fmt.Errorf("session: same-connection retry read immediate data: %w", readErr))
+			s.cleanupTask(tk.itt)
 			return
 		}
 		immediateData = immBuf[:n]
@@ -863,16 +890,18 @@ func (s *Session) retrySameConnection(tk *task) {
 	raw, encErr := buildSCSICommandPDU(cmd, tk.itt, tk.cmdSN, s.getExpStatSN(), immediateData)
 	if encErr != nil {
 		tk.cancel(fmt.Errorf("session: same-connection retry encode: %w", encErr))
+		s.cleanupTask(tk.itt)
 		return
 	}
 	s.stampDigests(raw)
 
 	select {
-	case s.writeCh <- raw:
+	case s.getWriteCh() <- raw:
 		s.cfg.logger.Info("session: same-connection retry sent",
 			"itt", fmt.Sprintf("0x%08x", tk.itt),
 			"cmd_sn", tk.cmdSN)
 	default:
 		tk.cancel(fmt.Errorf("session: same-connection retry write channel full"))
+		s.cleanupTask(tk.itt)
 	}
 }

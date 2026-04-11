@@ -2,6 +2,7 @@ package session
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -20,6 +21,7 @@ type task struct {
 	lun        uint64        // stored for TMF LUN-based cleanup (AbortTaskSet, LUNReset, ClearTaskSet)
 	cmd        Command       // stored for retry during ERL 0 recovery
 	cmdSN      uint32        // stored for same-connection retry at ERL >= 1 (RFC 7143 Section 6.2.1)
+	ctx        context.Context // per-call context; taskLoop selects on ctx.Done() for timeout after PDU send
 	buf        *bytes.Buffer // accumulates Data-In payload for read commands
 	resultCh   chan Result
 	done       chan struct{} // closed by cancel() to unblock taskLoop goroutine on session Close

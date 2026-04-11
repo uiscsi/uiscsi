@@ -785,10 +785,13 @@ func TestRetrySameConnectionCleanup(t *testing.T) {
 	t.Run("write_channel_full", func(t *testing.T) {
 		sess, _ := newTestSession(t)
 
-		// Fill the write channel so the send path hits the default case.
-		for range cap(sess.writeCh) {
-			sess.writeCh <- &transport.RawPDU{}
-		}
+		// Replace writeCh with a pre-filled channel so the send path hits the default case
+		// without filling the real session channel (which would block background goroutines).
+		fullCh := make(chan *transport.RawPDU, 1)
+		fullCh <- &transport.RawPDU{} // make it full
+		sess.mu.Lock()
+		sess.writeCh = fullCh
+		sess.mu.Unlock()
 
 		tk := newTask(44, false, false, 0)
 		tk.cmd = Command{}
@@ -910,6 +913,11 @@ func TestSubmitContextCancel(t *testing.T) {
 	if stillInTasks {
 		t.Fatalf("ITT 0x%08x still in s.tasks after context cancel", itt)
 	}
+
+	// Advance the command window (the cancelled command consumed one CmdSN slot;
+	// the target never responded so we must manually open the window before
+	// a second Submit can proceed without blocking).
+	sess.window.update(2, 10)
 
 	// A subsequent Submit on the same session must succeed (no lingering state).
 	cmd2 := Command{}
