@@ -129,7 +129,7 @@ func (s *Session) replaceConnection(cause error) error {
 			s.router.Unregister(newITT)
 			// NOW unregister the old ITT since we're giving up.
 			s.router.Unregister(itt)
-			tk.cancel(fmt.Errorf("session: task reassign failed: %s: %v", respStr, tmfErr))
+			tk.cancel(fmt.Errorf("session: task reassign failed: %s: %w", respStr, tmfErr))
 			continue
 		}
 
