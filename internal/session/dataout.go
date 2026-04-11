@@ -28,11 +28,8 @@ func (t *task) sendDataOutBurst(writeCh chan<- *transport.RawPDU,
 		n, err := io.ReadFull(t.reader, buf[:chunkSize])
 		if err != nil && err != io.ErrUnexpectedEOF {
 			transport.PutBuffer(bufBp)
-			if n == 0 {
-				return sent, fmt.Errorf("session: read write data: %w", err)
-			}
-			// Partial read with unexpected error -- still send what we have,
-			// but return the error after.
+			// Partial reads are discarded on non-EOF errors; the caller
+			// will see the error and can retry the entire burst.
 			return sent, fmt.Errorf("session: read write data: %w", err)
 		}
 		if n == 0 {
