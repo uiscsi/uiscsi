@@ -65,21 +65,37 @@ func (w *cmdWindow) acquire(ctx context.Context) (uint32, error) {
 	}
 
 	// Slow path: need to wait. Use a goroutine to bridge sync.Cond and context.
+	// Each caller gets its own waiterDone channel (buffer=1) so that cancelling
+	// one caller's context does NOT affect the window or other waiters.
+	// w.closed is reserved exclusively for session-level shutdown via close().
 	type result struct {
 		sn  uint32
 		err error
 	}
 	ch := make(chan result, 1)
+	waiterDone := make(chan struct{}, 1)
 
 	go func() {
 		// We already hold the lock from the caller above.
-		for !w.closed && !w.windowOpen() {
+		for {
+			// Check session shutdown first.
+			if w.closed {
+				w.mu.Unlock()
+				ch <- result{err: errWindowClosed}
+				return
+			}
+			// Check per-caller cancellation (non-blocking).
+			select {
+			case <-waiterDone:
+				w.mu.Unlock()
+				ch <- result{err: context.Canceled} // actual error set by outer select
+				return
+			default:
+			}
+			if w.windowOpen() {
+				break
+			}
 			w.cond.Wait()
-		}
-		if w.closed {
-			w.mu.Unlock()
-			ch <- result{err: errWindowClosed}
-			return
 		}
 		sn := w.cmdSN
 		w.cmdSN = serial.Incr(w.cmdSN)
@@ -91,12 +107,10 @@ func (w *cmdWindow) acquire(ctx context.Context) (uint32, error) {
 	case r := <-ch:
 		return r.sn, r.err
 	case <-ctx.Done():
-		// Wake the waiter so it can exit. It will see closed or re-check.
-		w.mu.Lock()
-		w.closed = true
+		// Signal only this waiter to exit — do NOT touch w.closed.
+		waiterDone <- struct{}{}
 		w.cond.Broadcast()
-		w.mu.Unlock()
-		// Drain the goroutine result.
+		// Drain to prevent goroutine leak.
 		<-ch
 		return 0, ctx.Err()
 	}
