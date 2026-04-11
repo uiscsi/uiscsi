@@ -14,6 +14,15 @@ import (
 // SCSI status. CHECK CONDITION (0x02) is returned as-is in [RawResult.Status]
 // or via [StreamResult.Wait]. Use [CheckStatus] or [ParseSenseData] for
 // convenience.
+//
+// # Security
+//
+// Raw CDB methods pass command descriptor blocks to the target without
+// interpretation or validation. Any SCSI command can be issued, including
+// destructive operations such as FORMAT UNIT, WRITE SAME with UNMAP, or
+// PERSISTENT RESERVE OUT with preempt-and-abort. Callers are responsible
+// for validating CDB content before submission. Prefer the typed [SCSIOps]
+// methods for commands with safe, validated parameter encoding.
 type RawOps struct {
 	s *Session
 }
@@ -24,6 +33,12 @@ type ExecuteOption = executeOption
 // Execute sends a raw CDB to the target and returns the buffered result.
 // The entire response is read into [RawResult.Data] as []byte.
 // For high-throughput streaming, use [RawOps.StreamExecute] instead.
+//
+// # Security
+//
+// Execute passes the CDB to the target without interpretation. Any SCSI
+// command can be issued, including destructive operations (FORMAT UNIT,
+// WRITE SAME, etc.). See [RawOps] for details.
 func (o *RawOps) Execute(ctx context.Context, lun uint64, cdb []byte, opts ...ExecuteOption) (*RawResult, error) {
 	return o.s.execute(ctx, lun, cdb, opts...)
 }
@@ -32,6 +47,12 @@ func (o *RawOps) Execute(ctx context.Context, lun uint64, cdb []byte, opts ...Ex
 // Response data is delivered via [StreamResult.Data] as an [io.Reader]
 // with bounded memory (~64KB). Call [StreamResult.Wait] after consuming
 // Data to retrieve the final SCSI status and sense data.
+//
+// # Security
+//
+// StreamExecute passes the CDB to the target without interpretation. Any
+// SCSI command can be issued, including destructive operations. See
+// [RawOps] for details.
 func (o *RawOps) StreamExecute(ctx context.Context, lun uint64, cdb []byte, opts ...ExecuteOption) (*StreamResult, error) {
 	return o.s.streamExecute(ctx, lun, cdb, opts...)
 }

@@ -39,7 +39,18 @@ func WithDialTimeout(d time.Duration) Option {
 	}
 }
 
-// WithCHAP enables CHAP authentication.
+// WithCHAP enables CHAP authentication for the iSCSI login exchange.
+//
+// # Security
+//
+// Without WithCHAP, login is unauthenticated — any initiator knowing the
+// target IQN can connect. CHAP authenticates the login phase only; the
+// iSCSI data phase is always transmitted in cleartext regardless of CHAP
+// usage. For environments where data confidentiality is required, protect
+// the iSCSI network with IPsec (RFC 7143 Section 8).
+//
+// CHAP secrets are accepted in memory and never written to disk by this
+// library. Use [WithMutualCHAP] for bidirectional authentication.
 func WithCHAP(user, secret string) Option {
 	return func(c *dialConfig) {
 		c.loginOpts = append(c.loginOpts, login.WithCHAP(user, secret))
