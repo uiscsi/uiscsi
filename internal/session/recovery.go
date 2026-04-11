@@ -115,7 +115,8 @@ func (s *Session) reconnect(cause error) {
 
 	for attempt := range s.cfg.maxReconnectAttempts {
 		if attempt > 0 {
-			delay := s.cfg.reconnectBackoff * time.Duration(1<<uint(max(0, attempt-1)))
+			exponent := min(attempt-1, 30) // cap to prevent overflow at large attempt counts
+			delay := s.cfg.reconnectBackoff * time.Duration(1<<uint(max(0, exponent)))
 			// Use a timer-based select so the reconnect goroutine can be
 			// interrupted by Close() without blocking for the full backoff period.
 			timer := time.NewTimer(delay)
