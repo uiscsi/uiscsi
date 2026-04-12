@@ -533,7 +533,9 @@ func TestDescriptorSenseBothDescriptors(t *testing.T) {
 		0x00,       // reserved
 		0xE0,       // filemark=1, EOM=1, ILI=1
 	}
-	descriptors := append(infoDesc, streamDesc...)
+	descriptors := make([]byte, 0, len(infoDesc)+len(streamDesc))
+	descriptors = append(descriptors, infoDesc...)
+	descriptors = append(descriptors, streamDesc...)
 
 	data := []byte{
 		0x72,

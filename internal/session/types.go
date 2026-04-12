@@ -151,9 +151,7 @@ func defaultConfig() sessionConfig {
 		maxReconnectAttempts: 3,
 		reconnectBackoff:     1 * time.Second,
 		snackTimeout:         5 * time.Second,
-		dialFunc: func(ctx context.Context, addr string, timeout time.Duration) (*transport.Conn, error) {
-			return transport.Dial(ctx, addr, timeout)
-		},
+		dialFunc: transport.Dial,
 	}
 }
 

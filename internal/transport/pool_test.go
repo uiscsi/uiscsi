@@ -159,6 +159,6 @@ func TestPutBufferNil(t *testing.T) {
 func TestGetBufferReturnType(t *testing.T) {
 	bp := GetBuffer(100)
 	// If GetBuffer returns []byte this would not compile.
-	var _ *[]byte = bp
+	_ = (*[]byte)(bp) // compile-time type assertion: GetBuffer must return *[]byte
 	PutBuffer(bp)
 }

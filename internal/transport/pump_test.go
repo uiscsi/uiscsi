@@ -546,10 +546,7 @@ func TestReadPump_OptionalPDUDropCounted(t *testing.T) {
 
 	// Wait for ReadPump to process the PDU and drop it.
 	deadline := time.After(2 * time.Second)
-	for {
-		if dropCounter.Load() >= 1 {
-			break
-		}
+	for dropCounter.Load() < 1 {
 		select {
 		case <-deadline:
 			t.Fatalf("timeout waiting for drop counter to reach 1; got %d", dropCounter.Load())
@@ -601,10 +598,7 @@ func TestReadPump_DropCounterAccumulates(t *testing.T) {
 
 	// Wait for all drops to register.
 	deadline := time.After(5 * time.Second)
-	for {
-		if dropCounter.Load() >= numDropped {
-			break
-		}
+	for dropCounter.Load() < numDropped {
 		select {
 		case <-deadline:
 			t.Fatalf("timeout waiting for drop counter = %d; got %d", numDropped, dropCounter.Load())
