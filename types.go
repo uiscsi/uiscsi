@@ -126,6 +126,18 @@ func (sr *StreamResult) Wait() (status uint8, senseData []byte, err error) {
 	return r.Status, r.SenseData, nil
 }
 
+// WaitResidual is like [Wait] but also returns the iSCSI residual underflow
+// count from the SCSI Response PDU. This is needed by tape drivers to determine
+// the actual record size for variable-block reads — TCMU targets rely on the
+// iSCSI residual because the kernel absorbs the SCSI-level ILI sense.
+func (sr *StreamResult) WaitResidual() (status uint8, senseData []byte, residual uint32, underflow bool, err error) {
+	r := <-sr.resultCh
+	if r.Err != nil {
+		return 0, nil, 0, false, r.Err
+	}
+	return r.Status, r.SenseData, r.ResidualCount, r.Underflow, nil
+}
+
 // InquiryData holds a parsed INQUIRY response.
 type InquiryData struct {
 	DeviceType uint8
