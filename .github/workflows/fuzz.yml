@@ -37,7 +37,7 @@ jobs:
           for target in $(go test -list 'Fuzz.*' . 2>/dev/null | grep '^Fuzz'); do
             go test -fuzz="^${target}$" -fuzztime=300s -fuzzminimizetime=30s .
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: fuzz-corpus-${{ matrix.package }}
