@@ -39,7 +39,18 @@ type Config struct {
 
 	// LUNs defines the LUNs to create. Each entry is a size in bytes.
 	// If empty, one 64MB LUN is created.
+	// Ignored when TCMUBackstorePath is set (TCMU targets always have one LUN).
 	LUNs []int64
+
+	// TCMUBackstorePath, when non-empty, causes Setup to skip iblock backstore
+	// creation entirely and instead create a single LUN symlinked to this path.
+	// The path must be the configfs backstore directory returned by
+	// tcmu.Device.BackstorePath() — e.g.
+	// "/sys/kernel/config/target/core/user_100/tape-e2e-0101".
+	//
+	// The caller (not Setup) owns the TCMU device lifecycle. Setup only wires
+	// the existing backstore into the LIO iSCSI fabric.
+	TCMUBackstorePath string
 
 	// CHAPUser and CHAPPassword enable one-way CHAP when non-empty.
 	CHAPUser     string
@@ -134,6 +145,7 @@ type setupState struct {
 	initiatorIQN   string
 	hasExplicitACL bool // true if explicit ACL was created (CHAP targets)
 	lunCount       int
+	isTCMU         bool // true when TCMUBackstorePath was used; skip backstore/loop/shm cleanup
 }
 
 // Setup creates a real LIO iSCSI target via configfs. It returns the target
@@ -186,48 +198,58 @@ func Setup(t *testing.T, cfg Config) (*Target, func()) {
 		t.Fatalf(format, args...)
 	}
 
-	// Step 1: Create iblock backstores via loop devices. The fileio backend
-	// has a kernel bug on some versions (e.g., 6.19) where ReadCapacity
-	// returns wrong capacity regardless of fd_dev_size. Using iblock +
-	// loop devices avoids this — blockdev capacity is always correct.
-	for i, size := range lunSizes {
-		bsName := fmt.Sprintf("e2e-%s-lun%d", suffix, i)
-		shmPath := filepath.Join(shmDir, bsName+".img")
+	if cfg.TCMUBackstorePath != "" {
+		// Step 1 (TCMU path): skip iblock/loop/shm creation entirely.
+		// The TCMU device has already created its configfs backstore at
+		// BackstorePath(). Setup only needs to wire it into the LIO fabric
+		// as lun_0. The caller owns the TCMU device lifecycle.
+		state.isTCMU = true
+		state.lunCount = 1
+		// backstoreNames, loopDevices, shmPaths remain nil.
+	} else {
+		// Step 1: Create iblock backstores via loop devices. The fileio backend
+		// has a kernel bug on some versions (e.g., 6.19) where ReadCapacity
+		// returns wrong capacity regardless of fd_dev_size. Using iblock +
+		// loop devices avoids this — blockdev capacity is always correct.
+		for i, size := range lunSizes {
+			bsName := fmt.Sprintf("e2e-%s-lun%d", suffix, i)
+			shmPath := filepath.Join(shmDir, bsName+".img")
 
-		// Create backing file (must be non-sparse for correct block count).
-		f, err := os.Create(shmPath)
-		if err != nil {
-			setupFatalf("create backing file %s: %v", shmPath, err)
-		}
-		if err := f.Truncate(size); err != nil {
+			// Create backing file (must be non-sparse for correct block count).
+			f, err := os.Create(shmPath)
+			if err != nil {
+				setupFatalf("create backing file %s: %v", shmPath, err)
+			}
+			if err := f.Truncate(size); err != nil {
+				f.Close()
+				setupFatalf("truncate backing file %s: %v", shmPath, err)
+			}
 			f.Close()
-			setupFatalf("truncate backing file %s: %v", shmPath, err)
-		}
-		f.Close()
 
-		// Create loop device.
-		out, err := execCommand("losetup", "-f", "--show", shmPath)
-		if err != nil {
-			setupFatalf("losetup for %s: %v (output: %s)", shmPath, err, out)
-		}
-		loopDev := strings.TrimSpace(out)
+			// Create loop device.
+			out, err := execCommand("losetup", "-f", "--show", shmPath)
+			if err != nil {
+				setupFatalf("losetup for %s: %v (output: %s)", shmPath, err, out)
+			}
+			loopDev := strings.TrimSpace(out)
 
-		state.backstoreNames = append(state.backstoreNames, bsName)
-		state.loopDevices = append(state.loopDevices, loopDev)
-		state.shmPaths = append(state.shmPaths, shmPath)
+			state.backstoreNames = append(state.backstoreNames, bsName)
+			state.loopDevices = append(state.loopDevices, loopDev)
+			state.shmPaths = append(state.shmPaths, shmPath)
 
-		// Create iblock backstore in configfs.
-		bsDir := filepath.Join(coreBase, backstoreHBA, bsName)
-		if err := os.MkdirAll(bsDir, 0o755); err != nil {
-			setupFatalf("mkdir backstore %s: %v", bsDir, err)
-		}
+			// Create iblock backstore in configfs.
+			bsDir := filepath.Join(coreBase, backstoreHBA, bsName)
+			if err := os.MkdirAll(bsDir, 0o755); err != nil {
+				setupFatalf("mkdir backstore %s: %v", bsDir, err)
+			}
 
-		ctrl := fmt.Sprintf("udev_path=%s", loopDev)
-		if err := writeConfigfs(filepath.Join(bsDir, "control"), ctrl); err != nil {
-			setupFatalf("write backstore control: %v", err)
-		}
-		if err := writeConfigfs(filepath.Join(bsDir, "enable"), "1"); err != nil {
-			setupFatalf("enable backstore: %v", err)
+			ctrl := fmt.Sprintf("udev_path=%s", loopDev)
+			if err := writeConfigfs(filepath.Join(bsDir, "control"), ctrl); err != nil {
+				setupFatalf("write backstore control: %v", err)
+			}
+			if err := writeConfigfs(filepath.Join(bsDir, "enable"), "1"); err != nil {
+				setupFatalf("enable backstore: %v", err)
+			}
 		}
 	}
 
@@ -250,16 +272,28 @@ func Setup(t *testing.T, cfg Config) (*Target, func()) {
 	}
 
 	// Step 5: Create LUNs and link to backstores.
-	for i, bsName := range state.backstoreNames {
-		lunDir := filepath.Join(tpgDir, "lun", fmt.Sprintf("lun_%d", i))
+	if state.isTCMU {
+		// TCMU path: create only lun_0 and symlink to the TCMU configfs backstore.
+		lunDir := filepath.Join(tpgDir, "lun", "lun_0")
 		if err := os.MkdirAll(lunDir, 0o755); err != nil {
-			setupFatalf("mkdir LUN %d: %v", i, err)
+			setupFatalf("mkdir LUN 0 (TCMU): %v", err)
 		}
-
-		bsTarget := filepath.Join(coreBase, backstoreHBA, bsName)
 		linkPath := filepath.Join(lunDir, "backstore")
-		if err := os.Symlink(bsTarget, linkPath); err != nil {
-			setupFatalf("symlink LUN %d to backstore: %v", i, err)
+		if err := os.Symlink(cfg.TCMUBackstorePath, linkPath); err != nil {
+			setupFatalf("symlink LUN 0 to TCMU backstore %s: %v", cfg.TCMUBackstorePath, err)
+		}
+	} else {
+		for i, bsName := range state.backstoreNames {
+			lunDir := filepath.Join(tpgDir, "lun", fmt.Sprintf("lun_%d", i))
+			if err := os.MkdirAll(lunDir, 0o755); err != nil {
+				setupFatalf("mkdir LUN %d: %v", i, err)
+			}
+
+			bsTarget := filepath.Join(coreBase, backstoreHBA, bsName)
+			linkPath := filepath.Join(lunDir, "backstore")
+			if err := os.Symlink(bsTarget, linkPath); err != nil {
+				setupFatalf("symlink LUN %d to backstore: %v", i, err)
+			}
 		}
 	}
 
@@ -413,30 +447,33 @@ func teardownState(st *setupState) {
 		log.Printf("lio cleanup: remove IQN: %v", err)
 	}
 
-	// 9. Disable and remove backstores.
-	for _, bsName := range st.backstoreNames {
-		bsDir := filepath.Join(coreBase, backstoreHBA, bsName)
-		// Disable before removal -- some kernels resist removing an
-		// enabled backstore that had references.
-		if err := writeConfigfs(filepath.Join(bsDir, "enable"), "0"); err != nil {
-			log.Printf("lio cleanup: disable backstore %s: %v", bsName, err)
+	if !st.isTCMU {
+		// 9. Disable and remove iblock backstores.
+		// For TCMU targets, the TCMU Device.Close() owns backstore cleanup.
+		for _, bsName := range st.backstoreNames {
+			bsDir := filepath.Join(coreBase, backstoreHBA, bsName)
+			// Disable before removal -- some kernels resist removing an
+			// enabled backstore that had references.
+			if err := writeConfigfs(filepath.Join(bsDir, "enable"), "0"); err != nil {
+				log.Printf("lio cleanup: disable backstore %s: %v", bsName, err)
+			}
+			if err := os.Remove(bsDir); err != nil {
+				log.Printf("lio cleanup: remove backstore %s: %v", bsName, err)
+			}
 		}
-		if err := os.Remove(bsDir); err != nil {
-			log.Printf("lio cleanup: remove backstore %s: %v", bsName, err)
-		}
-	}
 
-	// 10. Detach loop devices.
-	for _, loopDev := range st.loopDevices {
-		if _, err := execCommand("losetup", "-d", loopDev); err != nil {
-			log.Printf("lio cleanup: detach loop device %s: %v", loopDev, err)
+		// 10. Detach loop devices.
+		for _, loopDev := range st.loopDevices {
+			if _, err := execCommand("losetup", "-d", loopDev); err != nil {
+				log.Printf("lio cleanup: detach loop device %s: %v", loopDev, err)
+			}
 		}
-	}
 
-	// 11. Remove /dev/shm backing files.
-	for _, shmPath := range st.shmPaths {
-		if err := os.Remove(shmPath); err != nil {
-			log.Printf("lio cleanup: remove backing file %s: %v", shmPath, err)
+		// 11. Remove /dev/shm backing files.
+		for _, shmPath := range st.shmPaths {
+			if err := os.Remove(shmPath); err != nil {
+				log.Printf("lio cleanup: remove backing file %s: %v", shmPath, err)
+			}
 		}
 	}
 }
