@@ -1,0 +1,44 @@
+name: Fuzz
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - internal/pdu
+          - internal/scsi
+          - internal/login
+          - internal/session
+          - internal/transport
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+      - uses: actions/cache@v4
+        with:
+          path: ${{ matrix.package }}/testdata/fuzz/
+          key: fuzz-${{ matrix.package }}-${{ github.sha }}
+          restore-keys: |
+            fuzz-${{ matrix.package }}-
+      - name: Run fuzz tests
+        run: |
+          cd ${{ matrix.package }}
+          for target in $(go test -list 'Fuzz.*' . 2>/dev/null | grep '^Fuzz'); do
+            go test -fuzz="^${target}$" -fuzztime=300s -fuzzminimizetime=30s .
+          done
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: fuzz-corpus-${{ matrix.package }}
+          path: ${{ matrix.package }}/testdata/fuzz/
