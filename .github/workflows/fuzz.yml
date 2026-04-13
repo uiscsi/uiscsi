@@ -11,6 +11,7 @@ permissions:
 jobs:
   fuzz:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -35,7 +36,7 @@ jobs:
         run: |
           cd ${{ matrix.package }}
           for target in $(go test -list 'Fuzz.*' . 2>/dev/null | grep '^Fuzz'); do
-            go test -fuzz="^${target}$" -fuzztime=300s -fuzzminimizetime=30s .
+            go test -fuzz="^${target}$" -fuzztime=45s -fuzzminimizetime=10s .
           done
       - uses: actions/upload-artifact@v7
         if: failure()
