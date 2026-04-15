@@ -1,5 +1,6 @@
 .DS_Store
 .claude/worktrees/
+coverage.out
 
 # Compiled binaries
 discover-read
